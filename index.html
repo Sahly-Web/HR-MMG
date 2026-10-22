@@ -1,0 +1,3648 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>نظام إدارة الموارد البشرية لمساحات العمل المشتركة | Coworking Space HRMS (Google Sheets Backend)</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --font-ar: 'Cairo', 'Inter', sans-serif;
+      --font-mono: 'Inter', monospace;
+    }
+    * {
+      box-sizing: border-box;
+      font-family: var(--font-ar);
+    }
+    body {
+      background-color: #f1f5f9;
+      color: #0f172a;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    .num-ltr {
+      font-family: 'Inter', 'Cairo', sans-serif;
+      direction: ltr;
+      display: inline-block;
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(13, 148, 136, 0.28);
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .sheet-preview-header {
+      background-color: #0f172a;
+      color: #ffffff;
+      font-weight: 700;
+    }
+    .sheet-preview-row:nth-child(even) {
+      background-color: #f0fdfa;
+    }
+    .sheet-preview-row:nth-child(odd) {
+      background-color: #ffffff;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: 0.65; }
+    }
+    .live-dot {
+      animation: pulse-dot 2s infinite;
+    }
+    @media print {
+      body * { visibility: hidden; }
+      #printableEmployeeScheduleArea, #printableEmployeeScheduleArea * { visibility: visible; }
+      #printableEmployeeScheduleArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        box-shadow: none !important;
+        border: 1px solid #0f172a !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- إشعار عائم (Toast Notification) بدلاً من alert() -->
+  <div id="toastContainer" class="fixed bottom-5 left-5 z-50 flex flex-col gap-2 max-w-md w-full pointer-events-none px-4"></div>
+
+  <!-- الشريط العلوي (Top Header & Google Sheets Sync Bar) -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center font-extrabold text-lg shadow-inner">
+          CW
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base md:text-lg font-bold tracking-tight">نظام الموارد البشرية لمساحات العمل المشتركة</h1>
+            <span class="text-xs bg-teal-500/20 text-teal-300 border border-teal-500/40 px-2 py-0.5 rounded-full font-semibold">
+              Google Sheets Backend
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Coworking Space Multi-Branch HRMS • HTML + CSS + JS (Single-File Index) + Apps Script Auto-Formatter</p>
+        </div>
+      </div>
+
+      <!-- حالة الاتصال بـ Google Sheets وأزرار الإجراءات السريعة -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div id="syncStatusBadge" class="flex items-center gap-2 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-xs">
+          <span id="syncDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 live-dot"></span>
+          <span id="syncStatusText">محرك البيانات جاهز (9 شيتات مهيكلة)</span>
+        </div>
+
+        <button id="btnAutoFormatSheets" type="button" class="bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 shadow">
+          <span>✨</span>
+          <span>تهيئة وتنسيق الشيتات تلقائياً</span>
+        </button>
+
+        <button id="btnOpenGasCodeTab" type="button" class="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 shadow">
+          <span>📜</span>
+          <span>كود Google Apps Script</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- شريط التبويبات للموديولات التسعة -->
+    <div class="bg-slate-950/70 border-t border-slate-800/80">
+      <div class="max-w-7xl mx-auto px-4 py-2 flex items-center gap-1.5 overflow-x-auto custom-scroll">
+        <button type="button" data-tab="tab-dashboard" class="tab-btn active whitespace-nowrap px-3.5 py-2 rounded-lg text-xs font-bold text-slate-300 hover:bg-slate-800 transition">
+          📊 1. لوحة القيادة والتحليلات (M9)
+        </button>
+        <button type="button" data-tab="tab-corehr" class="tab-btn whitespace-nowrap px-3.5 py-2 rounded-lg text-xs font-bold text-slate-300 hover:bg-slate-800 transition">
+          🏢 2. الفروع والموظفون والعقود (M1)
+        </button>
+        <button type="button" data-tab="tab-payroll" class="tab-btn whitespace-nowrap px-3.5 py-2 rounded-lg text-xs font-bold text-slate-300 hover:bg-slate-800 transition">
+          💰 3. العمولات ومسير الرواتب (M3)
+        </button>
+        <button type="button" data-tab="tab-roster" class="tab-btn whitespace-nowrap px-3.5 py-2 rounded-lg text-xs font-bold text-teal-300 bg-teal-950/60 border border-teal-700/60 hover:bg-slate-800 transition">
+          🗓️ تنظيم الجداول و PDF الموظفين (8س / 12س)
+        </button>
+        <button type="button" data-tab="tab-attendance" class="tab-btn whitespace-nowrap px-3.5 py-2 rounded-lg text-xs font-bold text-slate-300 hover:bg-slate-800 transition">
+          📍 4. الورديات وبصمة الـ Geofence (M2)
+        </button>
+        <button type="button" data-tab="tab-leaves" class="tab-btn whitespace-nowrap px-3.5 py-2 rounded-lg text-xs font-bold text-slate-300 hover:bg-slate-800 transition">
+          🛡️ 5. الإجازات وتغطية الاستقبال (M4)
+        </button>
+        <button type="button" data-tab="tab-ess" class="tab-btn whitespace-nowrap px-3.5 py-2 rounded-lg text-xs font-bold text-slate-300 hover:bg-slate-800 transition">
+          🔄 6. بوابة الموظف وتبديل الورديات (M7)
+        </button>
+        <button type="button" data-tab="tab-ats-kpi" class="tab-btn whitespace-nowrap px-3.5 py-2 rounded-lg text-xs font-bold text-slate-300 hover:bg-slate-800 transition">
+          🎯 7. التوظيف والأداء وإخلاء الطرف (M5,6,8)
+        </button>
+        <button type="button" data-tab="tab-gas-backend" class="tab-btn whitespace-nowrap px-3.5 py-2 rounded-lg text-xs font-bold text-amber-300 hover:bg-slate-800 transition">
+          ⚙️ 8. كود جوجل شيت والتنسيق التلقائي (Code.gs)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- المحتوى الرئيسي -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 space-y-6">
+
+    <!-- شريط فلترة الفرع السريع -->
+    <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="text-xs font-bold text-slate-500">تصفية حسب فرع المساحة المشتركة:</span>
+        <select id="globalBranchFilter" class="bg-slate-50 border border-slate-300 text-slate-800 text-xs font-bold rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500">
+          <option value="ALL">جميع الفروع (Multi-Branch Consolidated)</option>
+        </select>
+        <span id="activeBranchMeta" class="text-xs text-teal-700 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-md font-semibold">
+          3 فروع نشطة • 455 مكتب مشترك وخاص
+        </span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <label for="gasWebAppUrlInput" class="font-semibold text-slate-600">رابط Google Script Web App (اختياري):</label>
+        <input id="gasWebAppUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" class="w-64 bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs num-ltr focus:outline-none focus:ring-2 focus:ring-teal-500" />
+        <button id="btnSaveWebhookUrl" type="button" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg font-semibold transition">
+          حفظ ومزامنة
+        </button>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- التبويب 1: لوحة القيادة والتحليلات (HR Analytics & Dashboards - M9) -->
+    <!-- =================================================================== -->
+    <div id="tab-dashboard" class="tab-panel space-y-6">
+      <!-- داشبورد الشفت اللحظي: الشفت دلوقتي فيه كم واحد؟ -->
+      <div class="bg-gradient-to-l from-slate-900 via-teal-950 to-slate-900 text-white rounded-2xl p-5 shadow-lg border border-teal-700/60 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-teal-800/70 pb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-2xl">
+              ⏱️
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 live-dot"></span>
+                <h2 class="text-base md:text-lg font-extrabold">داشبورد الشفت اللحظي: الشفت دلوقتي فيه كم واحد؟</h2>
+              </div>
+              <p class="text-xs text-teal-200 mt-0.5">
+                يرصد تلقائياً عدد الموظفين المتواجدين الآن عبر شفتات الـ 8 ساعات (8ص-4م | 3م-11م) وشفتات الـ 12 ساعة (8ص-8م | 11ص-11م)
+              </p>
+            </div>
+          </div>
+
+          <!-- أداة التحكم في اليوم والساعة لمعاينة التواجد اللحظي -->
+          <div class="flex flex-wrap items-center gap-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 text-xs">
+            <div>
+              <label for="liveShiftDaySelect" class="block text-[10px] text-slate-400 mb-0.5">اليوم:</label>
+              <select id="liveShiftDaySelect" class="bg-slate-800 text-white border border-slate-700 rounded-lg px-2.5 py-1.5 font-bold">
+                <option value="sat">السبت</option>
+                <option value="sun">الأحد</option>
+                <option value="mon">الإثنين</option>
+                <option value="tue">الثلاثاء</option>
+                <option value="wed">الأربعاء</option>
+                <option value="thu" selected>الخميس</option>
+                <option value="fri">الجمعة</option>
+              </select>
+            </div>
+            <div>
+              <label for="liveShiftHourSelect" class="block text-[10px] text-slate-400 mb-0.5">الساعة الآن (اختبر أي وقت):</label>
+              <select id="liveShiftHourSelect" class="bg-slate-800 text-amber-300 border border-slate-700 rounded-lg px-2.5 py-1.5 font-bold num-ltr">
+                <option value="8">08:00 ص (بداية الصباحي 8س و12س)</option>
+                <option value="10">10:00 ص (ذروة الصباح)</option>
+                <option value="11">11:00 ص (دخول شفت 11ص-11م)</option>
+                <option value="13" selected>01:00 م (تواجد 3 شفتات معاً)</option>
+                <option value="15">03:30 م (ذروة تقاطع الـ 4 شفتات معاً!)</option>
+                <option value="17">05:00 م (الفترة المسائية)</option>
+                <option value="19">07:00 م (قبل انتهاء شفت 8ص-8م)</option>
+                <option value="21">09:00 م (تواجد مسائي 3-11 و11-11)</option>
+                <option value="23">11:00 م (إغلاق الشفتات المسائية)</option>
+              </select>
+            </div>
+            <button id="btnSyncRealClockNow" type="button" class="bg-teal-600 hover:bg-teal-500 text-white font-bold px-3 py-2 rounded-lg transition mt-3.5">
+              🕒 الوقت الفعلي الآن
+            </button>
+            <button id="btnJumpToRosterFromDash" type="button" class="bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold px-3 py-2 rounded-lg transition mt-3.5">
+              🗓️ تنظيم الجداول و PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- عداد الشفت اللحظي وتوزيع الشفتات الأربعة -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <!-- إجمالي المتواجدين الآن -->
+          <div class="bg-emerald-600/25 border-2 border-emerald-400 rounded-xl p-4 flex flex-col justify-between">
+            <span class="text-xs font-bold text-emerald-200">إجمالي المتواجدين في الشفت الآن</span>
+            <div class="flex items-baseline gap-2 my-1">
+              <span id="liveTotalOnDutyCount" class="text-4xl font-extrabold text-white num-ltr">0</span>
+              <span class="text-xs font-bold text-emerald-300">موظف على رأس العمل</span>
+            </div>
+            <span id="liveShiftWindowNote" class="text-[11px] text-emerald-100 bg-emerald-950/70 px-2 py-1 rounded">
+              الخميس • الساعة 01:00 م
+            </span>
+          </div>
+
+          <!-- شفت 8 ساعات: 8:00 ص - 4:00 م -->
+          <div class="bg-slate-900/90 border border-teal-500/40 rounded-xl p-3.5 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-teal-300">شفت 8 ساعات (صباحي)</span>
+              <span id="liveBadge8hMorningState" class="text-[10px] bg-emerald-500 text-slate-950 font-extrabold px-1.5 py-0.5 rounded">شغال الآن</span>
+            </div>
+            <div class="text-xs font-bold text-white num-ltr">08:00 AM → 04:00 PM</div>
+            <div class="flex items-baseline justify-between pt-1">
+              <span class="text-xs text-slate-400">العدد في الشفت:</span>
+              <span id="liveCount8hMorning" class="text-xl font-extrabold text-teal-300 num-ltr">0</span>
+            </div>
+            <div id="liveNames8hMorning" class="text-[11px] text-slate-300 truncate"></div>
+          </div>
+
+          <!-- شفت 8 ساعات: 3:00 م - 11:00 م -->
+          <div class="bg-slate-900/90 border border-sky-500/40 rounded-xl p-3.5 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-sky-300">شفت 8 ساعات (مسائي)</span>
+              <span id="liveBadge8hEveningState" class="text-[10px] bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded">يبدأ 3:00 م</span>
+            </div>
+            <div class="text-xs font-bold text-white num-ltr">03:00 PM → 11:00 PM</div>
+            <div class="flex items-baseline justify-between pt-1">
+              <span class="text-xs text-slate-400">العدد في الشفت:</span>
+              <span id="liveCount8hEvening" class="text-xl font-extrabold text-sky-300 num-ltr">0</span>
+            </div>
+            <div id="liveNames8hEvening" class="text-[11px] text-slate-300 truncate"></div>
+          </div>
+
+          <!-- شفت 12 ساعة: 8:00 ص - 8:00 م -->
+          <div class="bg-slate-900/90 border border-purple-500/40 rounded-xl p-3.5 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-purple-300">شفت 12 ساعة (8ص-8م)</span>
+              <span id="liveBadge12h8to8State" class="text-[10px] bg-emerald-500 text-slate-950 font-extrabold px-1.5 py-0.5 rounded">شغال الآن</span>
+            </div>
+            <div class="text-xs font-bold text-white num-ltr">08:00 AM → 08:00 PM</div>
+            <div class="flex items-baseline justify-between pt-1">
+              <span class="text-xs text-slate-400">العدد في الشفت:</span>
+              <span id="liveCount12h8to8" class="text-xl font-extrabold text-purple-300 num-ltr">0</span>
+            </div>
+            <div id="liveNames12h8to8" class="text-[11px] text-slate-300 truncate"></div>
+          </div>
+
+          <!-- شفت 12 ساعة: 11:00 ص - 11:00 م -->
+          <div class="bg-slate-900/90 border border-amber-500/40 rounded-xl p-3.5 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-amber-300">شفت 12 ساعة (11ص-11م)</span>
+              <span id="liveBadge12h11to11State" class="text-[10px] bg-emerald-500 text-slate-950 font-extrabold px-1.5 py-0.5 rounded">شغال الآن</span>
+            </div>
+            <div class="text-xs font-bold text-white num-ltr">11:00 AM → 11:00 PM</div>
+            <div class="flex items-baseline justify-between pt-1">
+              <span class="text-xs text-slate-400">العدد في الشفت:</span>
+              <span id="liveCount12h11to11" class="text-xl font-extrabold text-amber-300 num-ltr">0</span>
+            </div>
+            <div id="liveNames12h11to11" class="text-[11px] text-slate-300 truncate"></div>
+          </div>
+        </div>
+
+        <!-- قائمة الموظفين المتواجدين في الشفت الآن بالتفصيل -->
+        <div class="bg-slate-950/60 rounded-xl p-3 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-bold text-teal-300">👥 الموظفون المتواجدون في المساحة الآن:</span>
+            <div id="liveActiveStaffPills" class="flex flex-wrap gap-1.5"></div>
+          </div>
+          <span id="liveBranchBreakdownText" class="text-[11px] text-slate-400 font-semibold"></span>
+        </div>
+      </div>
+
+      <!-- بطاقات المؤشرات الرئيسية -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500">إجمالي القوى العاملة والـ Roaming</span>
+            <span class="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center font-bold">👥</span>
+          </div>
+          <div id="kpiTotalEmployees" class="text-2xl font-extrabold text-slate-900 mt-2">0</div>
+          <div id="kpiRoamingCount" class="text-xs text-emerald-600 font-semibold mt-1">0 موظفين متعددي الفروع</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500">مبيعات العضويات والقاعات (الشهر)</span>
+            <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">📈</span>
+          </div>
+          <div id="kpiTotalRevenue" class="text-2xl font-extrabold text-slate-900 mt-2">0 ج.م</div>
+          <div id="kpiAverageOccupancy" class="text-xs text-blue-600 font-semibold mt-1">متوسط إشغال المكاتب: 87.8%</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500">إجمالي العمولات المستحقة (Split)</span>
+            <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">💸</span>
+          </div>
+          <div id="kpiTotalCommissions" class="text-2xl font-extrabold text-emerald-700 mt-2">0 ج.م</div>
+          <div id="kpiClawbackAlert" class="text-xs text-amber-600 font-semibold mt-1">تشمل عمولات المبيعات والاستقبال</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500">حالة تغطية الاستقبال والـ Geofence</span>
+            <span class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold">🛡️</span>
+          </div>
+          <div id="kpiCoverageStatus" class="text-xl font-extrabold text-slate-900 mt-2">100% مغطاة</div>
+          <div id="kpiGeofenceRate" class="text-xs text-purple-600 font-semibold mt-1">التزام البصمة الجغرافية ممتاز</div>
+        </div>
+      </div>
+
+      <!-- الرسوم البيانية التحليلية -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-sm font-bold text-slate-800">تكلفة الرواتب والعمولات مقابل إيرادات كل فرع</h2>
+              <p class="text-xs text-slate-500">تحليل ربحية الموارد البشرية (Labor Cost-to-Revenue Ratio)</p>
+            </div>
+            <span class="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-semibold">أكتوبر 2026</span>
+          </div>
+          <div class="relative h-72">
+            <canvas id="chartBranchLaborVsRev"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-sm font-bold text-slate-800">كثافة الأعضاء (Footfall) مقابل عدد موظفي التشغيل</h2>
+              <p class="text-xs text-slate-500">موازنة تغطية الاستقبال والضيافة على مدار 24 ساعة</p>
+            </div>
+            <span class="text-xs bg-teal-50 text-teal-700 px-2.5 py-1 rounded-md font-semibold">مباشر 24/7</span>
+          </div>
+          <div class="relative h-72">
+            <canvas id="chartFootfallVsStaff"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- جدول ملخص الفروع المباشر -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 class="text-sm font-bold text-slate-800">مصفوفة التشغيل اللحظية لفروع المساحة المشتركة (Branches Sheet Live View)</h2>
+            <p class="text-xs text-slate-500">تعرض إحداثيات الـ Geofence، الحد الأدنى للاستقبال، وسعة المكاتب ونسبة الإشغال</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto custom-scroll">
+          <table class="w-full text-right border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-900 text-white">
+                <th class="p-3 rounded-tr-lg">كود الفرع</th>
+                <th class="p-3">اسم الفرع</th>
+                <th class="p-3">إحداثيات الـ Geofence</th>
+                <th class="p-3">نطاق البصمة</th>
+                <th class="p-3">نمط التشغيل</th>
+                <th class="p-3">الحد الأدنى للاستقبال</th>
+                <th class="p-3">سعة المكاتب</th>
+                <th class="p-3">نسبة الإشغال %</th>
+                <th class="p-3 rounded-tl-lg">مدير المجتمع بالفرع</th>
+              </tr>
+            </thead>
+            <tbody id="dashboardBranchesTableBody" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- التبويب 2: الفروع والموظفون والعقود المرنة (Core HR - Module 1)     -->
+    <!-- =================================================================== -->
+    <div id="tab-corehr" class="tab-panel hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- نموذج إضافة موظف وعقد مرن -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+          <div class="border-b border-slate-100 pb-3">
+            <h2 class="text-sm font-bold text-slate-900">➕ تسجيل موظف جديد وعقد مرن (شيت Employees)</h2>
+            <p class="text-xs text-slate-500 mt-0.5">يدعم الدوام الكامل، الجزئي بالساعة، والعقود المرنة مع توزيع تكلفة الفروع</p>
+          </div>
+
+          <form id="formAddEmployee" class="space-y-3 text-xs">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">الاسم الكامل للموظف *</label>
+              <input id="empFullName" type="text" required placeholder="مثال: نورهان طارق عبد الرحمن" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">الرقم القومي *</label>
+                <input id="empNationalId" type="text" required placeholder="2980511020..." class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 num-ltr" />
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">رقم الموبايل *</label>
+                <input id="empPhone" type="text" required placeholder="01012345678" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 num-ltr" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">الفرع الأساسي *</label>
+                <select id="empBranchSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2"></select>
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">الدور الوظيفي بالمساحة *</label>
+                <select id="empRoleSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2">
+                  <option value="Community Manager">Community Manager (مدير مجتمع)</option>
+                  <option value="Sales & Leasing Executive">Sales & Leasing Executive (مبيعات)</option>
+                  <option value="Front Desk Host">Front Desk Host (استقبال وضيافة)</option>
+                  <option value="Night Shift Receptionist">Night Shift Receptionist (استقبال ليلي)</option>
+                  <option value="Facilities & IT Specialist">Facilities & IT Specialist (صيانة وتقنية)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">نوع العقد *</label>
+                <select id="empContractType" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2">
+                  <option value="دوام كامل (FULL_TIME)">دوام كامل (FULL_TIME)</option>
+                  <option value="دوام جزئي بالساعة (PART_TIME)">دوام جزئي بالساعة (PART_TIME)</option>
+                  <option value="عقد مرن بالوردية (FREELANCE)">عقد مرن بالوردية (FREELANCE)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">التنقل بين الفروع (Roaming)</label>
+                <select id="empRoamingSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2">
+                  <option value="نعم (Roaming)">نعم - يغطي عدة فروع</option>
+                  <option value="لا">لا - فرع واحد فقط</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">الراتب الأساسي الشهري (ج.م)</label>
+                <input id="empBaseSalary" type="number" min="0" value="12000" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 num-ltr" />
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">أجر الساعة للدوام الجزئي (ج.م)</label>
+                <input id="empHourlyRate" type="number" min="0" value="0" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 num-ltr" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">توزيع مركز التكلفة بين الفروع (Cost Allocation)</label>
+              <input id="empCostAllocation" type="text" value="100% الفرع الأساسي" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2" />
+            </div>
+
+            <button type="submit" class="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-2.5 rounded-xl shadow transition">
+              💾 حفظ الموظف في شيت Employees
+            </button>
+          </form>
+
+          <!-- نموذج سريع لإضافة فرع جديد -->
+          <div class="border-t border-slate-200 pt-4 mt-4">
+            <h3 class="text-xs font-bold text-slate-800 mb-2">🏢 إضافة فرع مساحة مشتركة جديد (شيت Branches)</h3>
+            <form id="formAddBranch" class="space-y-2 text-xs">
+              <div class="grid grid-cols-2 gap-2">
+                <input id="newBranchName" type="text" required placeholder="اسم الفرع (مثال: فرع جليم باي)" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5" />
+                <input id="newBranchCode" type="text" required placeholder="الكود (ALEX-GLEEM)" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 num-ltr" />
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <input id="newBranchLat" type="number" step="0.0001" required placeholder="Lat: 31.24" value="31.2394" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 num-ltr" />
+                <input id="newBranchLng" type="number" step="0.0001" required placeholder="Lng: 29.96" value="29.9662" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 num-ltr" />
+                <input id="newBranchDesks" type="number" min="10" required placeholder="سعة المكاتب" value="110" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 num-ltr" />
+              </div>
+              <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 rounded-lg transition">
+                إضافة الفرع إلى شيت Branches
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- جدول سجل الموظفين والعقود -->
+        <div class="lg:col-span-2 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <h2 class="text-sm font-bold text-slate-900">سجل الموظفين والعقود المرنة وتوزيع الفروع (Employees Sheet)</h2>
+              <p class="text-xs text-slate-500">يعرض حالة التنقل (Roaming)، نمط التعاقد، وتوزيع التكلفة المحاسبية</p>
+            </div>
+            <input id="searchEmployeeInput" type="search" placeholder="🔍 ابحث بالاسم أو الدور الوظيفي..." class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs w-60" />
+          </div>
+
+          <div class="overflow-x-auto custom-scroll flex-1">
+            <table class="w-full text-right border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-900 text-white">
+                  <th class="p-2.5 rounded-tr-lg">الكود</th>
+                  <th class="p-2.5">الاسم الكامل</th>
+                  <th class="p-2.5">الفرع الأساسي</th>
+                  <th class="p-2.5">الدور الوظيفي</th>
+                  <th class="p-2.5">نوع العقد</th>
+                  <th class="p-2.5">الراتب / الساعة</th>
+                  <th class="p-2.5">التنقل (Roaming)</th>
+                  <th class="p-2.5">توزيع التكلفة</th>
+                  <th class="p-2.5">الحالة</th>
+                  <th class="p-2.5 rounded-tl-lg text-center">إلغاء / تفعيل (حفظ البيانات)</th>
+                </tr>
+              </thead>
+              <tbody id="employeesTableBody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- التبويب 3: محرك العمولات ومسير الرواتب (Payroll & Commissions - M3) -->
+    <!-- =================================================================== -->
+    <div id="tab-payroll" class="tab-panel hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- حاسبة ومسجل مبيعات العضويات والعمولات المشتركة -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+          <div class="border-b border-slate-100 pb-3">
+            <h2 class="text-sm font-bold text-slate-900">💸 تسجيل فاتورة عضوية/قاعة وحساب العمولة (Split & Clawback)</h2>
+            <p class="text-xs text-slate-500 mt-0.5">يحسب العمولة تصاعدياً حسب نوع المنتج ومدة العقد ويقسمها بين المبيعات والاستقبال</p>
+          </div>
+
+          <form id="formAddCommissionEvent" class="space-y-3 text-xs">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">رقم فاتورة نظام المساحة (BMS)</label>
+                <input id="commInvoiceNo" type="text" required value="INV-CW-2026-890" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2 num-ltr" />
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">اسم العضو / الشركة *</label>
+                <input id="commClientName" type="text" required placeholder="شركة نكست لاب البرمجية" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">الفرع *</label>
+                <select id="commBranchSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2"></select>
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">نوع العملية *</label>
+                <select id="commEventType" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2">
+                  <option value="بيع عضوية جديدة (NEW_SALE)">بيع عضوية جديدة (NEW_SALE)</option>
+                  <option value="تجديد عضوية (RENEWAL)">تجديد عضوية (RENEWAL)</option>
+                  <option value="حجز قاعة/فعالية (BOOKING)">حجز قاعة/فعالية (BOOKING)</option>
+                  <option value="إلغاء واسترداد عمولة (CLAWBACK)">إلغاء واسترداد عمولة (CLAWBACK)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">فئة المنتج بالمساحة *</label>
+                <select id="commProductCategory" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2">
+                  <option value="مكتب خاص (PRIVATE_OFFICE)" data-base-rate="5">مكتب خاص (Private Office - 5%)</option>
+                  <option value="مكتب مخصص (DEDICATED_DESK)" data-base-rate="4">مكتب مخصص (Dedicated Desk - 4%)</option>
+                  <option value="مكتب مشترك (HOT_DESK)" data-base-rate="3">مكتب مشترك (Hot Desk - 3%)</option>
+                  <option value="قاعة اجتماعات/فعاليات (MEETING_ROOM)" data-base-rate="6">قاعة اجتماعات/فعاليات (6%)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">مدة الالتزام العقدي (شهور)</label>
+                <select id="commContractMonths" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2">
+                  <option value="1">شهر واحد (النسبة الأساسية)</option>
+                  <option value="6">6 أشهر (+1.5% بونص التزام)</option>
+                  <option value="12" selected>12 شهراً سنوي (+3.0% بونص التزام)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">صافي قيمة الفاتورة المحصلة بدون ضريبة (ج.م) *</label>
+              <input id="commNetAmount" type="number" min="100" step="50" required value="35000" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 num-ltr font-bold text-teal-800" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">الموظف المغلق (Sales Closer)</label>
+                <select id="commPrimaryEmp" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5"></select>
+                <div class="mt-1 flex items-center justify-between">
+                  <span class="text-[11px] text-slate-500">حصة التقسيم %:</span>
+                  <input id="commPrimarySplit" type="number" min="10" max="100" value="75" class="w-16 bg-white border border-slate-300 rounded px-1.5 py-0.5 text-center num-ltr" />
+                </div>
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">مضيف الجولة (Tour Host)</label>
+                <select id="commSecondaryEmp" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5"></select>
+                <div class="mt-1 flex items-center justify-between">
+                  <span class="text-[11px] text-slate-500">حصة التقسيم %:</span>
+                  <input id="commSecondarySplit" type="number" min="0" max="90" value="25" readonly class="w-16 bg-slate-100 border border-slate-300 rounded px-1.5 py-0.5 text-center num-ltr" />
+                </div>
+              </div>
+            </div>
+
+            <!-- معاينة فورية للعمولة المحتسبة -->
+            <div id="liveCommissionPreviewBox" class="bg-teal-950 text-white p-3 rounded-xl space-y-1 text-xs">
+              <div class="flex justify-between">
+                <span class="text-teal-300">نسبة العمولة المستحقة:</span>
+                <span id="previewCommRate" class="font-bold num-ltr">8.0%</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-teal-300">إجمالي العمولة:</span>
+                <span id="previewCommTotal" class="font-extrabold text-amber-300 num-ltr">2,800.00 ج.م</span>
+              </div>
+              <div class="flex justify-between text-[11px] text-slate-300 pt-1 border-t border-teal-800">
+                <span id="previewPrimaryShare">حصة الأساسي (75%): 2,100 ج.م</span>
+                <span id="previewSecondaryShare">حصة المساعد (25%): 700 ج.م</span>
+              </div>
+            </div>
+
+            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl shadow transition">
+              ✅ اعتماد العملية وترحيلها لشيت Sales_Commissions
+            </button>
+          </form>
+        </div>
+
+        <!-- دفتر أستاذ العمولات ومسير الرواتب الشامل -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- جدول العمولات -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900">دفتر أستاذ مبيعات المساحة والعمولات المقسمة (Sales_Commissions Sheet)</h2>
+                <p class="text-xs text-slate-500">يوثق العقود، مدد الالتزام، وتقسيم العمولة بين المبيعات والاستقبال، وحالات الاسترداد العكسي</p>
+              </div>
+            </div>
+            <div class="overflow-x-auto custom-scroll max-h-64">
+              <table class="w-full text-right border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-900 text-white">
+                    <th class="p-2.5 rounded-tr-lg">رقم الفاتورة</th>
+                    <th class="p-2.5">العضو / الشركة</th>
+                    <th class="p-2.5">المنتج والمدة</th>
+                    <th class="p-2.5">صافي الفاتورة</th>
+                    <th class="p-2.5">النسبة</th>
+                    <th class="p-2.5">المغلق (Closer)</th>
+                    <th class="p-2.5">المساعد (Host)</th>
+                    <th class="p-2.5 rounded-tl-lg">إجمالي العمولة</th>
+                  </tr>
+                </thead>
+                <tbody id="commissionsTableBody" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- جدول مسير الرواتب الشهرية (Payroll_Slips) -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900">مسير الرواتب الشهري المدمج بالعمولات والضرائب (Payroll_Slips Sheet)</h2>
+                <p class="text-xs text-slate-500">يدمج الراتب الأساسي/الساعات + العمل الإضافي + عمولات المبيعات + حافز الإشغال - التأمينات والضرائب والـ Clawback</p>
+              </div>
+              <button id="btnRecalculatePayroll" type="button" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-lg shadow transition">
+                🔄 إعادة احتساب وترحيل مسير أكتوبر 2026
+              </button>
+            </div>
+            <div class="overflow-x-auto custom-scroll">
+              <table class="w-full text-right border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-900 text-white">
+                    <th class="p-2.5 rounded-tr-lg">الموظف</th>
+                    <th class="p-2.5">الفرع والعقد</th>
+                    <th class="p-2.5">الأجر الأساسي/الساعات</th>
+                    <th class="p-2.5">الإضافي</th>
+                    <th class="p-2.5">العمولات والحوافز</th>
+                    <th class="p-2.5">إجمالي Gross</th>
+                    <th class="p-2.5">تأمينات وضرائب</th>
+                    <th class="p-2.5">خصم Clawback</th>
+                    <th class="p-2.5 rounded-tl-lg">صافي المستحق Net</th>
+                  </tr>
+                </thead>
+                <tbody id="payrollTableBody" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- التبويب الجديد: تنظيم جداول الموظفين الأسبوعية (8س/12س) وتصدير PDF   -->
+    <!-- =================================================================== -->
+    <div id="tab-roster" class="tab-panel hidden space-y-6">
+      <!-- شريط تعريف نظام الشفتات الأربعة وأدوات التنظيم السريع -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h2 class="text-base font-extrabold text-slate-900">🗓️ منظم جداول شفتات الموظفين الأسبوعي (Weekly Shift Roster Organizer)</h2>
+            <p class="text-xs text-slate-500 mt-0.5">
+              نظم جدول كل موظف مباشرة من داخل السيستم بنظام شفتات الـ 8 ساعات (8ص-4م أو 3م-11م) وشفتات الـ 12 ساعة (8ص-8م أو 11ص-11م) مع تصدير جدول أي موظف كملف PDF جاهز للإرسال
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="btnAutoBalanceRoster" type="button" class="bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow transition flex items-center gap-1.5">
+              <span>⚡</span>
+              <span>توزيع وتنظيم الجدول تلقائياً</span>
+            </button>
+            <button id="btnSaveRosterToSheets" type="button" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow transition flex items-center gap-1.5">
+              <span>💾</span>
+              <span>حفظ الجدول في Google Sheets (Weekly_Roster)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- دليل الشفتات الأربعة المعتمدة في النظام -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 text-xs">
+          <div class="p-3 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-between">
+            <div>
+              <div class="font-extrabold text-teal-900">شفت 8 ساعات صباحي</div>
+              <div class="text-[11px] text-teal-700 num-ltr font-bold">08:00 AM → 04:00 PM</div>
+            </div>
+            <span class="bg-teal-600 text-white px-2 py-0.5 rounded font-bold">8 س</span>
+          </div>
+          <div class="p-3 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-between">
+            <div>
+              <div class="font-extrabold text-sky-900">شفت 8 ساعات مسائي</div>
+              <div class="text-[11px] text-sky-700 num-ltr font-bold">03:00 PM → 11:00 PM</div>
+            </div>
+            <span class="bg-sky-600 text-white px-2 py-0.5 rounded font-bold">8 س</span>
+          </div>
+          <div class="p-3 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-between">
+            <div>
+              <div class="font-extrabold text-purple-900">شفت 12 ساعة (8 إلى 8)</div>
+              <div class="text-[11px] text-purple-700 num-ltr font-bold">08:00 AM → 08:00 PM</div>
+            </div>
+            <span class="bg-purple-600 text-white px-2 py-0.5 rounded font-bold">12 س</span>
+          </div>
+          <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between">
+            <div>
+              <div class="font-extrabold text-amber-900">شفت 12 ساعة (11 إلى 11)</div>
+              <div class="text-[11px] text-amber-700 num-ltr font-bold">11:00 AM → 11:00 PM</div>
+            </div>
+            <span class="bg-amber-600 text-white px-2 py-0.5 rounded font-bold">12 س</span>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-100 border border-slate-300 flex items-center justify-between">
+            <div>
+              <div class="font-extrabold text-slate-700">إجازة / راحة أسبوعية</div>
+              <div class="text-[11px] text-slate-500 font-semibold">Day Off</div>
+            </div>
+            <span class="bg-slate-600 text-white px-2 py-0.5 rounded font-bold">0 س</span>
+          </div>
+        </div>
+
+        <!-- أداة تطبيق شفت موحد لموظف على كل أيام الأسبوع بضغطة واحدة -->
+        <form id="formQuickAssignWeek" class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-wrap items-end gap-3 text-xs">
+          <div class="flex-1 min-w-[180px]">
+            <label class="block font-bold text-slate-700 mb-1">اختر الموظف لتنظيم جدوله السريع:</label>
+            <select id="quickRosterEmpSelect" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 font-bold"></select>
+          </div>
+          <div class="flex-1 min-w-[200px]">
+            <label class="block font-bold text-slate-700 mb-1">الشفت الأساسي طوال الأسبوع:</label>
+            <select id="quickRosterShiftSelect" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 font-bold">
+              <option value="8H_8_4">شفت 8 ساعات: من 08:00 ص إلى 04:00 م</option>
+              <option value="8H_3_11">شفت 8 ساعات: من 03:00 م إلى 11:00 م</option>
+              <option value="12H_8_8">شفت 12 ساعة: من 08:00 ص إلى 08:00 م</option>
+              <option value="12H_11_11">شفت 12 ساعة: من 11:00 ص إلى 11:00 م</option>
+            </select>
+          </div>
+          <div class="w-40">
+            <label class="block font-bold text-slate-700 mb-1">يوم الراحة الأسبوعية:</label>
+            <select id="quickRosterOffDaySelect" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 font-bold">
+              <option value="fri" selected>الجمعة (راحة)</option>
+              <option value="sat">السبت (راحة)</option>
+              <option value="sun">الأحد (راحة)</option>
+              <option value="mon">الإثنين (راحة)</option>
+              <option value="tue">الثلاثاء (راحة)</option>
+              <option value="wed">الأربعاء (راحة)</option>
+              <option value="thu">الخميس (راحة)</option>
+            </select>
+          </div>
+          <button type="submit" class="bg-teal-600 hover:bg-teal-500 text-white font-bold px-4 py-2 rounded-lg shadow transition">
+            ✅ تطبيق على جدول الموظف
+          </button>
+        </form>
+
+        <!-- كاشف التغطية اليومية وأيام المشاكل (كل يوم عندي كام واحد؟) مدمج مع الجدول -->
+        <div class="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400 live-dot"></span>
+                <h3 class="text-sm font-extrabold text-white">📊 كاشف التغطية اليومية: كل يوم عندي كام واحد؟ (تحديد أيام المشاكل والعجز فوراً)</h3>
+              </div>
+              <p class="text-[11px] text-slate-300 mt-0.5">
+                يحسب تلقائياً عدد الموظفين الأساسيين النشطين في كل يوم، وينبهك باللون الأحمر إذا قلّ العدد عن الحد الأدنى المطلوب أو إذا خلت الفترة الصباحية أو المسائية
+              </p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800 text-xs">
+              <div class="flex items-center gap-2">
+                <label for="minDailyStaffInput" class="text-slate-300 font-bold">الحد الأدنى المطلوب يومياً:</label>
+                <input id="minDailyStaffInput" type="number" min="1" max="20" value="4" class="w-16 bg-slate-800 text-amber-300 font-extrabold text-center border border-slate-700 rounded-lg py-1 num-ltr" />
+                <span class="text-slate-400">موظفين/يوم</span>
+              </div>
+              <div id="weeklyProblemsSummaryBadge" class="px-3 py-1 rounded-lg font-extrabold text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                جاري فحص الأسبوع...
+              </div>
+            </div>
+          </div>
+
+          <!-- بطاقات الأيام السبعة (السبت -> الجمعة) -->
+          <div id="dailyCoverageCardsGrid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 text-xs"></div>
+        </div>
+
+        <!-- الجدول التفاعلي لتنظيم شفتات الموظفين الأساسيين النشطين -->
+        <div class="overflow-x-auto custom-scroll border border-slate-200 rounded-xl">
+          <table class="w-full text-right border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-900 text-white">
+                <th class="p-3">الموظف الأساسي والفرع</th>
+                <th class="p-2.5 text-center">السبت</th>
+                <th class="p-2.5 text-center">الأحد</th>
+                <th class="p-2.5 text-center">الإثنين</th>
+                <th class="p-2.5 text-center">الثلاثاء</th>
+                <th class="p-2.5 text-center">الأربعاء</th>
+                <th class="p-2.5 text-center">الخميس</th>
+                <th class="p-2.5 text-center">الجمعة</th>
+                <th class="p-2.5 text-center">إجمالي الساعات</th>
+                <th class="p-2.5 text-center">إجراءات و PDF</th>
+              </tr>
+            </thead>
+            <tbody id="weeklyRosterTableBody" class="divide-y divide-slate-200"></tbody>
+            <tfoot id="weeklyRosterTableFoot" class="bg-slate-950 text-white font-bold border-t-2 border-teal-500"></tfoot>
+          </table>
+        </div>
+
+        <!-- قسم الموظفين الأساسيين (Master Core Staff Pool) مع الإلغاء بدون حذف البيانات -->
+        <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="text-sm font-extrabold text-slate-900">👥 قائمة الموظفين الأساسيين (Core Staff Pool — التحريك والإلغاء بدون حذف البيانات)</h3>
+              <p class="text-xs text-slate-600">
+                هؤلاء هم الموظفون الأساسيون الذين تتحرك منهم الجداول؛ عند إلغاء أي موظف يتوقف ظهوره في الشفتات النشطة فوراً بينما تظل جميع بياناته وسجلاته المالية والتاريخية محفوظة بالكامل ويمكنك إعادة تفعيله في أي وقت
+              </p>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <span id="coreStaffCountersBadge" class="bg-teal-100 text-teal-900 font-extrabold px-3 py-1.5 rounded-lg border border-teal-300">
+                5 نشطين في الجدول | 1 ملغي (محفوظ البيانات)
+              </span>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto custom-scroll bg-white rounded-xl border border-slate-200">
+            <table class="w-full text-right border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-800 text-white">
+                  <th class="p-2.5">الكود</th>
+                  <th class="p-2.5">اسم الموظف الأساسي</th>
+                  <th class="p-2.5">الفرع والدور</th>
+                  <th class="p-2.5">الراتب / العقد</th>
+                  <th class="p-2.5">الرقم القومي والهاتف (محفوظ دائماً)</th>
+                  <th class="p-2.5">حالة الموظف في الجداول</th>
+                  <th class="p-2.5 text-center">تحريك / إلغاء مع حفظ البيانات</th>
+                </tr>
+              </thead>
+              <tbody id="coreMasterStaffTableBody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- قسم استخراج وتحميل جدول الموظف الفردي كملف PDF جاهز للإرسال -->
+      <div id="employeePdfExportCard" class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h3 class="text-base font-extrabold text-slate-900">📄 استخراج جدول الموظف كملف PDF رسمي جاهز للإرسال</h3>
+            <p class="text-xs text-slate-500">اختر أي موظف لمعاينة جدوله الأسبوعي التفصيلي وتحميله فوراً بصيغة PDF أو نسخه لإرساله على واتساب</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <select id="pdfEmployeeSelect" class="bg-slate-50 border border-slate-300 text-slate-900 font-bold rounded-xl px-3 py-2"></select>
+            <input id="pdfWeekLabelInput" type="text" value="الأسبوع: 24 أكتوبر - 30 أكتوبر 2026" class="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-60 font-semibold" />
+            <button id="btnDownloadEmployeePdf" type="button" class="bg-rose-600 hover:bg-rose-500 text-white font-extrabold px-4 py-2 rounded-xl shadow transition flex items-center gap-1.5">
+              <span>📥</span>
+              <span>تحميل جدول الموظف PDF</span>
+            </button>
+            <button id="btnPrintEmployeePdf" type="button" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5">
+              <span>🖨️</span>
+              <span>طباعة / حفظ PDF</span>
+            </button>
+            <button id="btnCopyWhatsappSchedule" type="button" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5">
+              <span>💬</span>
+              <span>نسخ الجدول لواتساب</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- القالب الرسمي القابل للتحويل إلى PDF (A4 Clean Printable Card) -->
+        <div id="printableEmployeeScheduleArea" class="bg-white border-2 border-slate-800 rounded-2xl p-6 max-w-4xl mx-auto space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-4 border-b-2 border-slate-900 pb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-xl bg-teal-700 text-white flex items-center justify-center font-extrabold text-xl">
+                CW
+              </div>
+              <div>
+                <h4 class="text-lg font-extrabold text-slate-900">جدول شفتات العمل الأسبوعي المعتمد للموظف</h4>
+                <p id="pdfCardWeekSubtitle" class="text-xs font-bold text-teal-700">الأسبوع: 24 أكتوبر - 30 أكتوبر 2026 • نظام إدارة المساحة المشتركة</p>
+              </div>
+            </div>
+            <div class="text-left text-xs space-y-0.5">
+              <div class="font-bold text-slate-800">تاريخ الإصدار: <span class="num-ltr">2026-10-22</span></div>
+              <div class="text-slate-500">معتمد من إدارة التشغيل والموارد البشرية</div>
+            </div>
+          </div>
+
+          <!-- بيانات الموظف وملخص ساعاته في البطاقة -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
+            <div>
+              <span class="text-slate-500 block">اسم الموظف:</span>
+              <span id="pdfEmpName" class="font-extrabold text-slate-900 text-sm">—</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block">الرقم الوظيفي والدور:</span>
+              <span id="pdfEmpRoleAndCode" class="font-bold text-teal-800">—</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block">الفرع الأساسي والتنقل:</span>
+              <span id="pdfEmpBranch" class="font-bold text-slate-800">—</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block">إجمالي الساعات الأسبوعية:</span>
+              <span id="pdfEmpTotalHours" class="font-extrabold text-emerald-700 text-sm">—</span>
+            </div>
+          </div>
+
+          <!-- جدول الأيام السبعة التفصيلي للموظف داخل الـ PDF -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-right border-collapse text-xs border border-slate-300">
+              <thead>
+                <tr class="bg-slate-900 text-white">
+                  <th class="p-2.5 border border-slate-700">اليوم</th>
+                  <th class="p-2.5 border border-slate-700">نوع الشفت المعتمد</th>
+                  <th class="p-2.5 border border-slate-700 text-center">ميعاد الحضور (Start)</th>
+                  <th class="p-2.5 border border-slate-700 text-center">ميعاد الانصراف (End)</th>
+                  <th class="p-2.5 border border-slate-700 text-center">عدد الساعات</th>
+                  <th class="p-2.5 border border-slate-700">الفرع المكلف به</th>
+                  <th class="p-2.5 border border-slate-700">ملاحظات التشغيل</th>
+                </tr>
+              </thead>
+              <tbody id="pdfEmployeeScheduleRows" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+
+          <!-- تذييل وتوقيع الاعتماد في ملف الـ PDF -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-slate-200 text-xs text-slate-600">
+            <div>
+              <div class="font-bold text-slate-800">تعليمات البصمة والـ Geofencing:</div>
+              <p class="text-[11px] mt-0.5">يرجى تسجيل الحضور عبر تطبيق الجوال داخل النطاق الجغرافي للفرع قبل بداية الشفت بـ 10 دقائق.</p>
+            </div>
+            <div class="text-center">
+              <div class="font-bold text-slate-800 mb-4">توقيع الموظف بالعلم</div>
+              <div class="border-b border-dashed border-slate-400 w-40 mx-auto"></div>
+            </div>
+            <div class="text-center">
+              <div class="font-bold text-slate-800 mb-4">اعتماد مدير الفرع / HR</div>
+              <div class="border-b border-dashed border-slate-400 w-40 mx-auto"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- التبويب 4: الورديات وبصمة الجوال الجغرافية (Shifts & Geofencing - M2)-->
+    <!-- =================================================================== -->
+    <div id="tab-attendance" class="tab-panel hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- محاكي تطبيق الجوال وبصمة الـ Geofencing -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+          <div class="border-b border-slate-100 pb-3">
+            <h2 class="text-sm font-bold text-slate-900">📱 جهاز بصمة الجوال بالـ Geofencing (Shifts_Attendance)</h2>
+            <p class="text-xs text-slate-500 mt-0.5">يحسب المسافة الفعلية بالمتر (Haversine Formula) بين إحداثيات الموظف وفرع المساحة المشتركة</p>
+          </div>
+
+          <form id="formGeofenceCheckin" class="space-y-3 text-xs">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">اختر الموظف *</label>
+              <select id="attEmployeeSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2"></select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">فرع تسجيل الحضور *</label>
+                <select id="attBranchSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2"></select>
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">الوردية (24/7 Shift) *</label>
+                <select id="attShiftSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2">
+                  <option value="شفت 8 ساعات (08:00 ص - 04:00 م)" data-hours="8">شفت 8 ساعات (08:00 ص - 04:00 م)</option>
+                  <option value="شفت 8 ساعات (03:00 م - 11:00 م)" data-hours="8">شفت 8 ساعات (03:00 م - 11:00 م)</option>
+                  <option value="شفت 12 ساعة (08:00 ص - 08:00 م)" data-hours="12">شفت 12 ساعة (08:00 ص - 08:00 م)</option>
+                  <option value="شفت 12 ساعة (11:00 ص - 11:00 م)" data-hours="12">شفت 12 ساعة (11:00 ص - 11:00 م)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">خط عرض الجوال (Lat)</label>
+                <input id="attInputLat" type="number" step="0.0001" value="31.2158" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 num-ltr" />
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">خط طول الجوال (Lng)</label>
+                <input id="attInputLng" type="number" step="0.0001" value="29.9555" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 num-ltr" />
+              </div>
+            </div>
+
+            <div class="flex gap-2">
+              <button id="btnSimulateInsideGeofence" type="button" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-1.5 rounded-lg transition">
+                📍 محاكاة داخل الفرع (25م)
+              </button>
+              <button id="btnSimulateOutsideGeofence" type="button" class="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold py-1.5 rounded-lg transition">
+                ⚠️ محاكاة خارج النطاق (480م)
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">ساعات العمل الفعلية</label>
+                <input id="attWorkedHours" type="number" min="1" max="16" step="0.5" value="8" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 num-ltr" />
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">ساعات إضافية (Overtime)</label>
+                <input id="attOvertimeHours" type="number" min="0" max="8" step="0.5" value="1.5" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 num-ltr" />
+              </div>
+            </div>
+
+            <!-- نتيجة فحص الـ Geofence المباشرة -->
+            <div id="geofenceLiveResult" class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-1">
+              <div class="font-bold flex items-center justify-between">
+                <span>حالة النطاق الجغرافي (Geofence):</span>
+                <span id="geoStatusBadge" class="bg-emerald-600 text-white px-2 py-0.5 rounded text-[11px]">داخل النطاق (28 متر)</span>
+              </div>
+              <p id="geoRoamingNote" class="text-[11px] text-emerald-700">الفرع المختار يطابق الفرع الأساسي أو مصرح بالتنقل إليه (Roaming).</p>
+            </div>
+
+            <button type="submit" class="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-2.5 rounded-xl shadow transition">
+              📲 تسجيل البصمة في شيت Shifts_Attendance
+            </button>
+          </form>
+        </div>
+
+        <!-- جدول سجلات الحضور والورديات -->
+        <div class="lg:col-span-2 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <h2 class="text-sm font-bold text-slate-900">سجل الورديات والحضور الجغرافي والتنقل بين الفروع (Shifts_Attendance Sheet)</h2>
+              <p class="text-xs text-slate-500">يرصد المسافة بالمتر عن الفرع، ساعات العمل والإضافي، وحالات تغطية الفروع الأخرى (Roaming)</p>
+            </div>
+          </div>
+          <div class="overflow-x-auto custom-scroll">
+            <table class="w-full text-right border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-900 text-white">
+                  <th class="p-2.5 rounded-tr-lg">التاريخ</th>
+                  <th class="p-2.5">الموظف</th>
+                  <th class="p-2.5">الفرع المسجل به</th>
+                  <th class="p-2.5">الوردية</th>
+                  <th class="p-2.5">الساعات (+إضافي)</th>
+                  <th class="p-2.5">المسافة عن الفرع</th>
+                  <th class="p-2.5">حالة الـ Geofence</th>
+                  <th class="p-2.5 rounded-tl-lg">نمط الحضور</th>
+                </tr>
+              </thead>
+              <tbody id="attendanceTableBody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- التبويب 5: الإجازات ومحرك ضمان تغطية الاستقبال (Leave Coverage - M4) -->
+    <!-- =================================================================== -->
+    <div id="tab-leaves" class="tab-panel hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+          <div class="border-b border-slate-100 pb-3">
+            <h2 class="text-sm font-bold text-slate-900">🛡️ طلب إجازة مع فحص تغطية الاستقبال (Shift Coverage Validation)</h2>
+            <p class="text-xs text-slate-500 mt-0.5">يمنع النظام ترك مكتب استقبال المساحة المشتركة أقل من الحد الأدنى المطلوب بدون بديل</p>
+          </div>
+
+          <form id="formLeaveRequest" class="space-y-3 text-xs">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">الموظف مقدم الطلب *</label>
+              <select id="leaveEmpSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2"></select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">نوع الإجازة *</label>
+                <select id="leaveTypeSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2">
+                  <option value="اعتيادية سنوية">اعتيادية سنوية</option>
+                  <option value="عارضة طارئة">عارضة طارئة</option>
+                  <option value="بدل راحة وردية ليلية">بدل راحة وردية ليلية</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">عدد الأيام *</label>
+                <input id="leaveDaysCount" type="number" min="1" max="15" value="2" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 num-ltr" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">من تاريخ</label>
+                <input id="leaveStartDate" type="date" value="2026-10-25" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 num-ltr" />
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">إلى تاريخ</label>
+                <input id="leaveEndDate" type="date" value="2026-10-26" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 num-ltr" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">الموظف البديل لتغطية الوردية (Replacement Staff)</label>
+              <select id="leaveReplacementSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2"></select>
+            </div>
+
+            <div id="leaveCoverageAlertBox" class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
+              ✅ فحص التغطية الآلي: تم تحديد موظف بديل؛ تغطية الفرع آمنة ولا تقل عن الحد الأدنى.
+            </div>
+
+            <button type="submit" class="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-2.5 rounded-xl shadow transition">
+              📩 إرسال الطلب لشيت Leaves_Coverage
+            </button>
+          </form>
+        </div>
+
+        <div class="lg:col-span-2 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <h2 class="text-sm font-bold text-slate-900 mb-1">سجل الإجازات ونتائج فحص تغطية الفروع (Leaves_Coverage Sheet)</h2>
+          <p class="text-xs text-slate-500 mb-4">يمكن لمدير الفرع اعتماد أو رفض الطلبات بناءً على مؤشر أمان التغطية التشغيلية</p>
+          <div class="overflow-x-auto custom-scroll">
+            <table class="w-full text-right border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-900 text-white">
+                  <th class="p-2.5 rounded-tr-lg">الموظف</th>
+                  <th class="p-2.5">الفرع والدور</th>
+                  <th class="p-2.5">نوع الإجازة</th>
+                  <th class="p-2.5">الفترة</th>
+                  <th class="p-2.5">الموظف البديل</th>
+                  <th class="p-2.5">نتيجة فحص التغطية</th>
+                  <th class="p-2.5">الحالة</th>
+                  <th class="p-2.5 rounded-tl-lg">إجراء المدير</th>
+                </tr>
+              </thead>
+              <tbody id="leavesTableBody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- التبويب 6: بوابة الموظف وتبديل الورديات الذاتي (ESS / Shift Swaps M7)-->
+    <!-- =================================================================== -->
+    <div id="tab-ess" class="tab-panel hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+          <div class="border-b border-slate-100 pb-3">
+            <h2 class="text-sm font-bold text-slate-900">🔄 طلب تبديل وردية بين الزملاء (Shift Swapping ESS)</h2>
+            <p class="text-xs text-slate-500 mt-0.5">يتحقق آلياً من عدم وقوع أي موظف في ورديتين متتاليتين (Double Shift Guard)</p>
+          </div>
+
+          <form id="formShiftSwap" class="space-y-3 text-xs">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">الموظف صاحب الطلب *</label>
+              <select id="swapRequesterSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2"></select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">وردية الطالب الحالية *</label>
+              <input id="swapRequesterShift" type="text" required value="الأحد 25 أكتوبر - وردية مسائية (4م - 12ص)" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2" />
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">الزميل المستهدف للتبديل *</label>
+              <select id="swapTargetSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2"></select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">وردية الزميل المقابلة *</label>
+              <input id="swapTargetShift" type="text" required value="الإثنين 26 أكتوبر - وردية صباحية (8ص - 4م)" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2" />
+            </div>
+
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow transition">
+              🔄 تسجيل طلب التبديل في شيت Shift_Swaps_ESS
+            </button>
+          </form>
+        </div>
+
+        <div class="lg:col-span-2 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <h2 class="text-sm font-bold text-slate-900 mb-1">طلبات تبديل الورديات التفاعلية وبوابة الخدمة الذاتية (Shift_Swaps_ESS Sheet)</h2>
+          <p class="text-xs text-slate-500 mb-4">تتطلب موافقة الزميل ثم اعتماد مدير الفرع مع ضمان راحة 12 ساعة على الأقل بين الورديات</p>
+          <div class="overflow-x-auto custom-scroll">
+            <table class="w-full text-right border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-900 text-white">
+                  <th class="p-2.5 rounded-tr-lg">الموظف الطالب</th>
+                  <th class="p-2.5">ورديته</th>
+                  <th class="p-2.5">الزميل البديل</th>
+                  <th class="p-2.5">ورديته</th>
+                  <th class="p-2.5">فحص منع الـ Double Shift</th>
+                  <th class="p-2.5">موافقة الزميل</th>
+                  <th class="p-2.5 rounded-tl-lg">اعتماد المدير</th>
+                </tr>
+              </thead>
+              <tbody id="swapsTableBody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- التبويب 7: التوظيف (Trial Shifts) وKPIs وإخلاء الطرف السريع (M5,6,8) -->
+    <!-- =================================================================== -->
+    <div id="tab-ats-kpi" class="tab-panel hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- قسم التوظيف وورديات المعايشة وتقييم الأداء (ATS_KPIs) -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h2 class="text-sm font-bold text-slate-900">🎯 التوظيف (Trial Shifts) وبطاقة أداء المجتمع (ATS_KPIs Sheet)</h2>
+              <p class="text-xs text-slate-500">يجمع بين تقييم "يوم المعايشة الميداني" للمرشحين ومؤشرات رضا الأعضاء والاحتفاظ بهم (Retention & NPS)</p>
+            </div>
+          </div>
+
+          <form id="formAddAtsKpi" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">نوع السجل *</label>
+              <select id="atsKpiType" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5">
+                <option value="تقييم KPI شهري لموظف">تقييم KPI شهري لموظف</option>
+                <option value="مرشح توظيف - يوم معايشة (Trial Shift)">مرشح توظيف - يوم معايشة (Trial Shift)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">اسم الموظف / المرشح *</label>
+              <input id="atsKpiName" type="text" required placeholder="مثال: نادين سامح (مرشحة Community)" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5" />
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">تقييم رضا الأعضاء (NPS من 100)</label>
+              <input id="atsNpsScore" type="number" min="0" max="100" value="92" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 num-ltr" />
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">معدل الاحتفاظ بالأعضاء (Retention %)</label>
+              <input id="atsRetentionPct" type="number" min="0" max="100" value="94" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 num-ltr" />
+            </div>
+            <div class="sm:col-span-2">
+              <button type="submit" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2 rounded-lg transition">
+                ➕ حفظ التقييم / نتيجة المعايشة في شيت ATS_KPIs
+              </button>
+            </div>
+          </form>
+
+          <div class="overflow-x-auto custom-scroll">
+            <table class="w-full text-right border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-900 text-white">
+                  <th class="p-2 rounded-tr-lg">النوع</th>
+                  <th class="p-2">الاسم</th>
+                  <th class="p-2">الفرع</th>
+                  <th class="p-2">NPS</th>
+                  <th class="p-2">Retention %</th>
+                  <th class="p-2">الدرجة</th>
+                  <th class="p-2 rounded-tl-lg">التوصية</th>
+                </tr>
+              </thead>
+              <tbody id="atsKpiTableBody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- قسم إخلاء الطرف السريع وإيقاف الأقفال الذكية (Offboarding_Assets) -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+          <div class="border-b border-slate-100 pb-3">
+            <h2 class="text-sm font-bold text-slate-900">🔐 إخلاء الطرف السريع وإلغاء البطاقات الذكية (Offboarding_Assets Sheet)</h2>
+            <p class="text-xs text-slate-500">إيقاف فوري لصلاحيات Smart Lock RFID، حساب BMS، واستلام عهدة الفرع</p>
+          </div>
+
+          <form id="formOffboarding" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs bg-rose-50/60 p-3.5 rounded-xl border border-rose-200">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">الموظف *</label>
+              <select id="offEmpSelect" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5"></select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">نوع الإجراء *</label>
+              <select id="offActionType" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5">
+                <option value="إخلاء طرف سريع (Rapid Clearance)">إخلاء طرف سريع (Rapid Clearance)</option>
+                <option value="إيقاف مؤقت للصلاحيات الذكية">إيقاف مؤقت للصلاحيات الذكية</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">العهدة المستلمة</label>
+              <input id="offAssetsInput" type="text" value="Master RFID Card + MacBook Air" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5" />
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">صافي التسوية المالية (ج.م)</label>
+              <input id="offSettlementAmount" type="number" value="8450" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 num-ltr" />
+            </div>
+            <div class="sm:col-span-2">
+              <button type="submit" class="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 rounded-lg transition">
+                ⚡ تنفيذ إخلاء الطرف وإيقاف الـ RFID في شيت Offboarding_Assets
+              </button>
+            </div>
+          </form>
+
+          <div class="overflow-x-auto custom-scroll">
+            <table class="w-full text-right border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-900 text-white">
+                  <th class="p-2 rounded-tr-lg">الموظف</th>
+                  <th class="p-2">الإجراء</th>
+                  <th class="p-2">العهدة</th>
+                  <th class="p-2">بطاقة Smart Lock</th>
+                  <th class="p-2">حساب BMS</th>
+                  <th class="p-2 rounded-tl-lg">التسوية</th>
+                </tr>
+              </thead>
+              <tbody id="offboardingTableBody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- التبويب 8: كود Google Apps Script الكامل والتنسيق التلقائي للشيتات    -->
+    <!-- =================================================================== -->
+    <div id="tab-gas-backend" class="tab-panel hidden space-y-6">
+      <div class="bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 text-white rounded-2xl p-6 shadow-lg border border-teal-800/60">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="space-y-1 max-w-2xl">
+            <span class="text-xs font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+              Google Sheets Auto-Architect
+            </span>
+            <h2 class="text-lg font-extrabold mt-1">كود الباك إند الكامل على Google Apps Script (`Code.gs`) مع التنسيق التلقائي للشيتات</h2>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              يقوم هذا الكود بإنشاء الجداول التسعة تلقائياً في ملف Google Sheets الخاص بك، وضبط اتجاهها من اليمين لليسار (`RTL`)، وتلوين الترويسات باللون الكحلي الداكن (`#0f172a`)، وتجميد الصف الأول، وتطبيق التناوب اللوني (`Teal Banding`)، وتنسيق العملات والنسب المئوية، وإضافة قواعد التنسيق الشرطي للحالات، وربطها بهذا الملف (`index.html`).
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="btnCopyGasCode" type="button" class="bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md transition flex items-center gap-2">
+              <span>📋</span>
+              <span id="copyBtnText">نسخ كود Code.gs بالكامل</span>
+            </button>
+            <button id="btnPreviewSheetFormatting" type="button" class="bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md transition">
+              👁️ معاينة تنسيق الشيتات التسعة
+            </button>
+          </div>
+        </div>
+
+        <!-- خطوات التركيب السريعة في 3 خطوات -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-5 text-xs">
+          <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-3">
+            <div class="font-bold text-amber-300 mb-1">الخطوة 1: لصق كود الباك إند (`Code.gs`)</div>
+            <p class="text-slate-300">افتح ملف Google Sheet جديد، ومن القائمة اختر <b>Extensions &gt; Apps Script</b>، وامسح الكود الافتراضي والصق كود <code>Code.gs</code> الموجود بالأسفل.</p>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-3">
+            <div class="font-bold text-teal-300 mb-1">الخطوة 2: إضافة ملف الواجهة (`index.html`)</div>
+            <p class="text-slate-300">من علامة <b>(+)</b> بجانب Files في محرر Apps Script، اختر <b>HTML</b> وسمِّ الملف <code>index</code> (بدون .html) والصق فيه كود ملف <code>index.html</code> هذا بالكامل.</p>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-3">
+            <div class="font-bold text-emerald-300 mb-1">الخطوة 3: تشغيل التنسيق التلقائي والنشر</div>
+            <p class="text-slate-300">شغّل الدالة <code>setupAndFormatDatabase</code> مرة واحدة لبناء وتنسيق الـ 9 شيتات فوراً، ثم اضغط <b>Deploy &gt; New deployment &gt; Web app</b>.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- معاينة حية لشكل الشيتات بعد التنسيق التلقائي -->
+      <div id="sheetFormattingPreviewCard" class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">🎨 محاكاة شكل الجداول داخل Google Sheets بعد تشغيل `setupAndFormatDatabase()`</h3>
+            <p class="text-xs text-slate-500">اختر أي شيت من الشيتات التسعة لمعاينة الأعمدة، الألوان، والتنسيق الشرطي الذي ينشئه السكريبت تلقائياً</p>
+          </div>
+          <div id="sheetTabsSelector" class="flex flex-wrap gap-1.5"></div>
+        </div>
+        <div class="overflow-x-auto custom-scroll border border-slate-300 rounded-xl">
+          <table class="w-full text-right border-collapse text-xs">
+            <thead id="sheetPreviewThead"></thead>
+            <tbody id="sheetPreviewTbody" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- مربع عرض كود Google Apps Script -->
+      <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
+        <div class="bg-slate-900 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+            <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+            <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+            <span class="text-xs font-mono text-slate-300 ml-2">Code.gs — Google Apps Script (Auto-Formatting + Full CRUD + Webhooks)</span>
+          </div>
+          <button id="btnCopyGasCodeBottom" type="button" class="bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
+            نسخ الكود
+          </button>
+        </div>
+        <pre class="p-4 text-xs text-emerald-300 overflow-x-auto custom-scroll max-h-[520px] leading-relaxed num-ltr text-left"><code id="gasCodeDisplayBlock"></code></pre>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- المحرك البرمجي الشامل (JavaScript Application State & GAS Bridge)     -->
+  <!-- ===================================================================== -->
+  <script>
+    // 1. حالة التطبيق والبيانات المبدئية المطابقة لهيكل شيتات جوجل التسعة
+    const APP_STATE = {
+      selectedBranch: 'ALL',
+      gasWebAppUrl: '',
+      branches: [
+        {
+          id: 'BR-01',
+          code: 'ALEX-KAFR',
+          name: 'فرع كفر عبده - الإسكندرية',
+          city: 'الإسكندرية',
+          lat: 31.2156,
+          lng: 29.9553,
+          radius: 120,
+          is247: 'نعم (24/7)',
+          minFrontDesk: 2,
+          totalDesks: 140,
+          occupancyPct: 91.5,
+          manager: 'سارة المنشاوي',
+          status: 'نشط (ACTIVE)',
+          monthlyRevenue: 310000
+        },
+        {
+          id: 'BR-02',
+          code: 'ALEX-SMOUHA',
+          name: 'فرع سموحة هب - الإسكندرية',
+          city: 'الإسكندرية',
+          lat: 31.2112,
+          lng: 29.9441,
+          radius: 100,
+          is247: 'لا (8ص-11م)',
+          minFrontDesk: 2,
+          totalDesks: 95,
+          occupancyPct: 84.0,
+          manager: 'عمر عبد العزيز',
+          status: 'نشط (ACTIVE)',
+          monthlyRevenue: 195000
+        },
+        {
+          id: 'BR-03',
+          code: 'CAI-NEWCAIRO',
+          name: 'فرع التجمع الخامس - القاهرة',
+          city: 'القاهرة',
+          lat: 30.0131,
+          lng: 31.4285,
+          radius: 150,
+          is247: 'نعم (24/7)',
+          minFrontDesk: 3,
+          totalDesks: 220,
+          occupancyPct: 88.0,
+          manager: 'أحمد الكيلاني',
+          status: 'نشط (ACTIVE)',
+          monthlyRevenue: 485000
+        }
+      ],
+      employees: [
+        {
+          id: 'EMP-101',
+          empNo: 'CW-2026-01',
+          name: 'سارة المنشاوي',
+          nationalId: '29504120201124',
+          phone: '01092233441',
+          email: 'sara@coworkhub.eg',
+          branch: 'فرع كفر عبده - الإسكندرية',
+          dept: 'إدارة المجتمع (Community)',
+          role: 'Community Manager',
+          contractType: 'دوام كامل (FULL_TIME)',
+          baseSalary: 16500,
+          hourlyRate: 0,
+          roaming: 'نعم (Roaming)',
+          costAllocation: '80% كفر عبده | 20% سموحة',
+          insured: 'نعم',
+          hireDate: '2024-03-01',
+          status: 'نشط (ACTIVE)'
+        },
+        {
+          id: 'EMP-102',
+          empNo: 'CW-2026-02',
+          name: 'كريم طارق الجمل',
+          nationalId: '29708190204412',
+          phone: '01283344552',
+          email: 'karim@coworkhub.eg',
+          branch: 'فرع كفر عبده - الإسكندرية',
+          dept: 'المبيعات والتأجير (Sales)',
+          role: 'Sales & Leasing Executive',
+          contractType: 'دوام كامل (FULL_TIME)',
+          baseSalary: 12000,
+          hourlyRate: 0,
+          roaming: 'نعم (Roaming)',
+          costAllocation: '50% كفر عبده | 50% التجمع',
+          insured: 'نعم',
+          hireDate: '2024-06-15',
+          status: 'نشط (ACTIVE)'
+        },
+        {
+          id: 'EMP-103',
+          empNo: 'CW-2026-03',
+          name: 'مريم وائل نصار',
+          nationalId: '30201150208831',
+          phone: '01145566773',
+          email: 'mariam@coworkhub.eg',
+          branch: 'فرع كفر عبده - الإسكندرية',
+          dept: 'الاستقبال (Front Desk)',
+          role: 'Front Desk Host',
+          contractType: 'دوام جزئي بالساعة (PART_TIME)',
+          baseSalary: 0,
+          hourlyRate: 85,
+          roaming: 'لا',
+          costAllocation: '100% كفر عبده',
+          insured: 'لا',
+          hireDate: '2025-02-10',
+          status: 'نشط (ACTIVE)'
+        },
+        {
+          id: 'EMP-104',
+          empNo: 'CW-2026-04',
+          name: 'يوسف محمود زكي',
+          nationalId: '30109220203319',
+          phone: '01556677884',
+          email: 'youssef@coworkhub.eg',
+          branch: 'فرع سموحة هب - الإسكندرية',
+          dept: 'الاستقبال (Front Desk)',
+          role: 'Night Shift Receptionist',
+          contractType: 'دوام كامل (FULL_TIME)',
+          baseSalary: 9500,
+          hourlyRate: 0,
+          roaming: 'نعم (Roaming)',
+          costAllocation: '100% سموحة هب',
+          insured: 'نعم',
+          hireDate: '2025-01-01',
+          status: 'نشط (ACTIVE)'
+        },
+        {
+          id: 'EMP-105',
+          empNo: 'CW-2026-05',
+          name: 'حسن إبراهيم الشاذلي',
+          nationalId: '29111040209911',
+          phone: '01019988775',
+          email: 'hassan@coworkhub.eg',
+          branch: 'فرع التجمع الخامس - القاهرة',
+          dept: 'الصيانة والمرافق (Facilities)',
+          role: 'Facilities & IT Specialist',
+          contractType: 'عقد مرن بالوردية (FREELANCE)',
+          baseSalary: 11000,
+          hourlyRate: 0,
+          roaming: 'نعم (Roaming)',
+          costAllocation: '40% كفر عبده | 60% التجمع',
+          insured: 'لا',
+          hireDate: '2024-09-01',
+          status: 'نشط (ACTIVE)',
+          isActive: true
+        },
+        {
+          id: 'EMP-106',
+          empNo: 'CW-2026-06',
+          name: 'رامي عادل فؤاد',
+          nationalId: '29407110205518',
+          phone: '01066778899',
+          email: 'ramy@coworkhub.eg',
+          branch: 'فرع سموحة هب - الإسكندرية',
+          dept: 'الاستقبال (Front Desk)',
+          role: 'Front Desk Host',
+          contractType: 'دوام كامل (FULL_TIME)',
+          baseSalary: 9000,
+          hourlyRate: 0,
+          roaming: 'نعم (Roaming)',
+          costAllocation: '100% سموحة هب',
+          insured: 'نعم',
+          hireDate: '2024-05-10',
+          status: 'ملغي - محفوظ البيانات (ARCHIVED)',
+          isActive: false
+        }
+      ],
+      minDailyStaffRequired: 4,
+      commissions: [
+        {
+          id: 'COM-901',
+          date: '2026-10-05',
+          invoiceNo: 'INV-ALEX-4410',
+          clientName: 'TechSphere Solutions LLC',
+          branch: 'فرع كفر عبده - الإسكندرية',
+          eventType: 'بيع عضوية جديدة (NEW_SALE)',
+          productCategory: 'مكتب خاص (PRIVATE_OFFICE)',
+          units: 8,
+          months: 12,
+          netAmount: 48000,
+          primaryEmp: 'كريم طارق الجمل',
+          primarySplit: 75,
+          secondaryEmp: 'مريم وائل نصار',
+          secondarySplit: 25,
+          ratePct: 8.0,
+          totalCommission: 3840,
+          primaryAmount: 2880,
+          secondaryAmount: 960,
+          status: 'معتمد للصرف'
+        },
+        {
+          id: 'COM-902',
+          date: '2026-10-12',
+          invoiceNo: 'INV-ALEX-4452',
+          clientName: 'استوديو أركيتكتس للتصميم',
+          branch: 'فرع كفر عبده - الإسكندرية',
+          eventType: 'تجديد عضوية (RENEWAL)',
+          productCategory: 'مكتب مخصص (DEDICATED_DESK)',
+          units: 4,
+          months: 6,
+          netAmount: 22000,
+          primaryEmp: 'سارة المنشاوي',
+          primarySplit: 80,
+          secondaryEmp: 'مريم وائل نصار',
+          secondarySplit: 20,
+          ratePct: 5.5,
+          totalCommission: 1210,
+          primaryAmount: 968,
+          secondaryAmount: 242,
+          status: 'معتمد للصرف'
+        },
+        {
+          id: 'COM-903',
+          date: '2026-10-18',
+          invoiceNo: 'INV-CAI-8812',
+          clientName: 'FinPay Egypt',
+          branch: 'فرع التجمع الخامس - القاهرة',
+          eventType: 'إلغاء واسترداد عمولة (CLAWBACK)',
+          productCategory: 'مكتب خاص (PRIVATE_OFFICE)',
+          units: 3,
+          months: 12,
+          netAmount: 15000,
+          primaryEmp: 'كريم طارق الجمل',
+          primarySplit: 100,
+          secondaryEmp: 'لا يوجد',
+          secondarySplit: 0,
+          ratePct: 6.0,
+          totalCommission: -900,
+          primaryAmount: -900,
+          secondaryAmount: 0,
+          status: 'خصم استرداد (CLAWBACK)'
+        }
+      ],
+      attendance: [
+        {
+          id: 'ATT-501',
+          date: '2026-10-22',
+          empId: 'EMP-101',
+          empName: 'سارة المنشاوي',
+          branch: 'فرع كفر عبده - الإسكندرية',
+          shift: 'صباحية (08:00 ص - 04:00 م)',
+          checkIn: '07:55',
+          checkOut: '16:10',
+          workedHours: 8.0,
+          overtimeHours: 1.0,
+          coords: '31.2157, 29.9554',
+          distanceM: 18,
+          geofenceStatus: 'داخل النطاق (INSIDE_GEOFENCE)',
+          mode: 'فرع أساسي'
+        },
+        {
+          id: 'ATT-502',
+          date: '2026-10-22',
+          empId: 'EMP-103',
+          empName: 'مريم وائل نصار',
+          branch: 'فرع كفر عبده - الإسكندرية',
+          shift: 'صباحية (08:00 ص - 04:00 م)',
+          checkIn: '08:00',
+          checkOut: '16:00',
+          workedHours: 8.0,
+          overtimeHours: 0.0,
+          coords: '31.2155, 29.9552',
+          distanceM: 24,
+          geofenceStatus: 'داخل النطاق (INSIDE_GEOFENCE)',
+          mode: 'دوام جزئي بالساعة (160 س/شهر)'
+        },
+        {
+          id: 'ATT-503',
+          date: '2026-10-22',
+          empId: 'EMP-105',
+          empName: 'حسن إبراهيم الشاذلي',
+          branch: 'فرع سموحة هب - الإسكندرية',
+          shift: 'مسائية (04:00 م - 12:00 ص)',
+          checkIn: '15:50',
+          checkOut: '23:55',
+          workedHours: 8.0,
+          overtimeHours: 2.0,
+          coords: '31.2113, 29.9442',
+          distanceM: 31,
+          geofenceStatus: 'داخل النطاق (INSIDE_GEOFENCE)',
+          mode: 'مهمة تنقل (Roaming Support)'
+        }
+      ],
+      leaves: [
+        {
+          id: 'LV-301',
+          submittedAt: '2026-10-20',
+          empId: 'EMP-103',
+          empName: 'مريم وائل نصار',
+          branch: 'فرع كفر عبده - الإسكندرية',
+          role: 'Front Desk Host',
+          leaveType: 'اعتيادية سنوية',
+          startDate: '2026-10-27',
+          endDate: '2026-10-28',
+          days: 2,
+          replacement: 'يوسف محمود زكي (Roaming)',
+          coverageCheck: 'آمن - تغطية الاستقبال مكتملة (2/2)',
+          status: 'معتمد'
+        },
+        {
+          id: 'LV-302',
+          submittedAt: '2026-10-21',
+          empId: 'EMP-104',
+          empName: 'يوسف محمود زكي',
+          branch: 'فرع سموحة هب - الإسكندرية',
+          role: 'Night Shift Receptionist',
+          leaveType: 'عارضة طارئة',
+          startDate: '2026-10-24',
+          endDate: '2026-10-24',
+          days: 1,
+          replacement: 'بدون بديل',
+          coverageCheck: 'عجز تغطية! الاستقبال ينخفض إلى (1/2)',
+          status: 'قيد المراجعة'
+        }
+      ],
+      shiftSwaps: [
+        {
+          id: 'SWP-201',
+          date: '2026-10-21',
+          requester: 'مريم وائل نصار',
+          requesterShift: 'السبت 24 أكتوبر - مسائية (4م-12ص)',
+          targetPeer: 'يوسف محمود زكي',
+          targetShift: 'الأحد 25 أكتوبر - صباحية (8ص-4م)',
+          branch: 'فرع كفر عبده - الإسكندرية',
+          doubleShiftCheck: 'آمن (فاصل راحة 16 ساعة)',
+          peerStatus: 'موافق',
+          managerStatus: 'معتمد'
+        }
+      ],
+      atsKpis: [
+        {
+          id: 'KPI-701',
+          type: 'تقييم KPI شهري لموظف',
+          name: 'سارة المنشاوي',
+          branch: 'فرع كفر عبده - الإسكندرية',
+          role: 'Community Manager',
+          dateOrMonth: 'أكتوبر 2026',
+          nps: 94,
+          retentionPct: 93.5,
+          salesTargetPct: 108,
+          finalScore: 96,
+          decision: 'استحقاق حافز إشغال الفرع كاملاً'
+        },
+        {
+          id: 'ATS-702',
+          type: 'مرشح توظيف - يوم معايشة (Trial Shift)',
+          name: 'هدى سامي عبد اللطيف',
+          branch: 'فرع التجمع الخامس - القاهرة',
+          role: 'Community Associate',
+          dateOrMonth: '2026-10-19 (4 ساعات معايشة)',
+          nps: 91,
+          retentionPct: 90.0,
+          salesTargetPct: 100,
+          finalScore: 91,
+          decision: 'توصية بالتعيين الفوري'
+        }
+      ],
+      shiftCatalog: {
+        '8H_8_4': {
+          code: '8H_8_4',
+          label: 'شفت 8س (8:00 ص - 4:00 م)',
+          shortLabel: '8ص - 4م (8س)',
+          category: '8 ساعات',
+          startHour: 8,
+          endHour: 16,
+          startText: '08:00 صباحاً',
+          endText: '04:00 مساءً',
+          hours: 8,
+          badgeClass: 'bg-teal-100 text-teal-900 border-teal-300'
+        },
+        '8H_3_11': {
+          code: '8H_3_11',
+          label: 'شفت 8س (3:00 م - 11:00 م)',
+          shortLabel: '3م - 11م (8س)',
+          category: '8 ساعات',
+          startHour: 15,
+          endHour: 23,
+          startText: '03:00 مساءً',
+          endText: '11:00 مساءً',
+          hours: 8,
+          badgeClass: 'bg-sky-100 text-sky-900 border-sky-300'
+        },
+        '12H_8_8': {
+          code: '12H_8_8',
+          label: 'شفت 12س (8:00 ص - 8:00 م)',
+          shortLabel: '8ص - 8م (12س)',
+          category: '12 ساعة',
+          startHour: 8,
+          endHour: 20,
+          startText: '08:00 صباحاً',
+          endText: '08:00 مساءً',
+          hours: 12,
+          badgeClass: 'bg-purple-100 text-purple-900 border-purple-300'
+        },
+        '12H_11_11': {
+          code: '12H_11_11',
+          label: 'شفت 12س (11:00 ص - 11:00 م)',
+          shortLabel: '11ص - 11م (12س)',
+          category: '12 ساعة',
+          startHour: 11,
+          endHour: 23,
+          startText: '11:00 صباحاً',
+          endText: '11:00 مساءً',
+          hours: 12,
+          badgeClass: 'bg-amber-100 text-amber-900 border-amber-300'
+        },
+        'OFF': {
+          code: 'OFF',
+          label: 'راحة أسبوعية (OFF)',
+          shortLabel: 'إجازة / راحة',
+          category: 'راحة',
+          startHour: -1,
+          endHour: -1,
+          startText: '—',
+          endText: '—',
+          hours: 0,
+          badgeClass: 'bg-slate-100 text-slate-500 border-slate-300'
+        }
+      },
+      daysList: [
+        { key: 'sat', name: 'السبت' },
+        { key: 'sun', name: 'الأحد' },
+        { key: 'mon', name: 'الإثنين' },
+        { key: 'tue', name: 'الثلاثاء' },
+        { key: 'wed', name: 'الأربعاء' },
+        { key: 'thu', name: 'الخميس' },
+        { key: 'fri', name: 'الجمعة' }
+      ],
+      weeklyRoster: {
+        'EMP-101': { sat: '8H_8_4', sun: '8H_8_4', mon: '12H_8_8', tue: '8H_8_4', wed: '8H_8_4', thu: '8H_8_4', fri: 'OFF' },
+        'EMP-102': { sat: '12H_11_11', sun: '8H_3_11', mon: '8H_3_11', tue: '12H_11_11', wed: '8H_3_11', thu: '12H_11_11', fri: 'OFF' },
+        'EMP-103': { sat: '8H_8_4', sun: '8H_3_11', mon: '8H_8_4', tue: '8H_3_11', wed: 'OFF', thu: '8H_8_4', fri: '8H_3_11' },
+        'EMP-104': { sat: '12H_8_8', sun: '12H_8_8', mon: 'OFF', tue: '12H_8_8', wed: '12H_11_11', thu: '12H_8_8', fri: '12H_11_11' },
+        'EMP-105': { sat: '8H_3_11', sun: '12H_11_11', mon: '8H_3_11', tue: 'OFF', wed: '12H_8_8', thu: '8H_3_11', fri: '12H_8_8' }
+      },
+      offboarding: [
+        {
+          id: 'OFF-801',
+          date: '2026-10-15',
+          empId: 'EMP-099',
+          empName: 'رامي عادل فؤاد (موظف سابق)',
+          branch: 'فرع سموحة هب - الإسكندرية',
+          actionType: 'إخلاء طرف سريع (Rapid Clearance)',
+          assets: 'بطاقة RFID Master + مفاتيح الخزائن',
+          rfidStatus: 'تم الإيقاف الفوري (REVOKED)',
+          bmsStatus: 'تم سحب صلاحية BMS والـ Wi-Fi',
+          settlement: 7200,
+          status: 'مكتمل'
+        }
+      ]
+    };
+
+    // 2. الكود المصدري الكامل لملف Code.gs لعرضه ونسخه بضغطة زر
+    const GAS_BACKEND_SOURCE_CODE = `/**
+ * ============================================================================
+ * نظام إدارة الموارد البشرية المخصص لمساحات العمل المشتركة (Coworking Space HRMS)
+ * Google Apps Script Backend + Automatic Sheets Architect & Formatter
+ * الملف: Code.gs
+ * ============================================================================
+ */
+
+const SYSTEM_CONFIG = {
+  APP_TITLE: 'Coworking Space Enterprise HRMS',
+  TIMEZONE: 'Africa/Cairo',
+  CURRENCY_FORMAT: '#,##0.00 "ج.م"',
+  PERCENT_FORMAT: '0.0"%"',
+  HEADER_BG: '#0f172a',
+  HEADER_FG: '#ffffff'
+};
+
+const SHEETS_SCHEMA = {
+  Branches: {
+    tabColor: '#0d9488',
+    headers: ['معرف الفرع (ID)', 'كود الفرع', 'اسم الفرع', 'المدينة', 'خط العرض (Lat)', 'خط الطول (Lng)', 'نطاق البصمة (متر)', 'تشغيل 24/7', 'الحد الأدنى للاستقبال', 'سعة المكاتب الكلية', 'نسبة الإشغال الحالية %', 'مدير الفرع', 'الحالة'],
+    widths: [130, 100, 190, 110, 115, 115, 125, 100, 140, 130, 140, 160, 100],
+    currencyCols: [],
+    percentCols: [11]
+  },
+  Employees: {
+    tabColor: '#2563eb',
+    headers: ['معرف الموظف (ID)', 'الرقم الوظيفي', 'الاسم الكامل', 'الرقم القومي', 'الهاتف', 'البريد الإلكتروني', 'الفرع الأساسي', 'القسم', 'الدور الوظيفي', 'نوع العقد', 'الراتب الأساسي', 'أجر الساعة (للجزئي)', 'مسموح بالتنقل (Roaming)', 'توزيع التكلفة بين الفروع', 'خاضع للتأمينات', 'تاريخ التعيين', 'الحالة'],
+    widths: [130, 110, 180, 140, 130, 190, 160, 130, 160, 140, 130, 130, 145, 200, 115, 120, 110],
+    currencyCols: [11, 12],
+    percentCols: []
+  },
+  Shifts_Attendance: {
+    tabColor: '#7c3aed',
+    headers: ['معرف السجل (ID)', 'التاريخ', 'معرف الموظف', 'اسم الموظف', 'الفرع المسجل به', 'نوع الوردية', 'وقت الحضور', 'وقت الانصراف', 'ساعات العمل الفعلية', 'ساعات إضافية (Overtime)', 'إحداثيات الموظف (Lat,Lng)', 'المسافة عن الفرع (متر)', 'حالة الـ Geofence', 'نوع الحضور (أساسي/متنقل)'],
+    widths: [130, 115, 120, 175, 160, 140, 110, 110, 135, 145, 180, 145, 140, 150],
+    currencyCols: [],
+    percentCols: []
+  },
+  Sales_Commissions: {
+    tabColor: '#059669',
+    headers: ['معرف العملية (ID)', 'تاريخ الفاتورة', 'رقم فاتورة BMS', 'اسم العضو / الشركة', 'الفرع', 'نوع العملية', 'فئة المنتج (Coworking)', 'عدد المكاتب/الساعات', 'مدة العقد (شهور)', 'صافي الفاتورة (بدون ضريبة)', 'الموظف الأساسي (Closer)', 'نسبة الأساسي %', 'الموظف المساعد (Tour Host)', 'نسبة المساعد %', 'نسبة العمولة المطبقة %', 'إجمالي العمولة المحتسبة', 'عمولة الأساسي', 'عمولة المساعد', 'الحالة'],
+    widths: [130, 115, 140, 185, 150, 135, 165, 130, 125, 165, 170, 115, 175, 115, 140, 155, 130, 130, 130],
+    currencyCols: [10, 16, 17, 18],
+    percentCols: [12, 14, 15]
+  },
+  Payroll_Slips: {
+    tabColor: '#d97706',
+    headers: ['معرف القسيمة (ID)', 'دورة الرواتب (الشهر)', 'معرف الموظف', 'اسم الموظف', 'الفرع الأساسي', 'نوع العقد', 'أيام/ساعات العمل', 'الأجر الأساسي المستحق', 'أجر العمل الإضافي', 'عمولات المبيعات والتجديد', 'حافز إشغال الفرع و KPIs', 'إجمالي الاستحقاقات (Gross)', 'حصة الموظف تأمينات (11%)', 'ضريبة كسب العمل', 'خصم استرداد عمولة (Clawback)', 'إجمالي الاستقطاعات', 'صافي الراتب المستحق (Net)', 'حالة الصرف'],
+    widths: [130, 130, 120, 175, 155, 135, 130, 150, 135, 160, 155, 165, 155, 135, 180, 145, 165, 120],
+    currencyCols: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+    percentCols: []
+  },
+  Leaves_Coverage: {
+    tabColor: '#db2777',
+    headers: ['معرف الطلب (ID)', 'تاريخ التقديم', 'معرف الموظف', 'اسم الموظف', 'الفرع', 'الدور الوظيفي', 'نوع الإجازة', 'من تاريخ', 'إلى تاريخ', 'عدد الأيام', 'الموظف البديل للتغطية', 'فحص تغطية الاستقبال الآلي', 'حالة الاعتماد'],
+    widths: [130, 120, 120, 175, 155, 150, 130, 115, 115, 100, 175, 195, 130],
+    currencyCols: [],
+    percentCols: []
+  },
+  Shift_Swaps_ESS: {
+    tabColor: '#4f46e5',
+    headers: ['معرف التبديل (ID)', 'تاريخ الطلب', 'الموظف الطالب', 'وردية الطالب وتاريخها', 'الزميل المستهدف', 'وردية الزميل وتاريخها', 'الفرع', 'فحص منع الوردية المزدوجة (Double Shift)', 'موافقة الزميل', 'اعتماد مدير الفرع'],
+    widths: [130, 120, 170, 185, 170, 185, 150, 210, 130, 140],
+    currencyCols: [],
+    percentCols: []
+  },
+  ATS_KPIs: {
+    tabColor: '#0284c7',
+    headers: ['معرف السجل (ID)', 'النوع (توظيف / تقييم KPI)', 'الاسم (المرشح / الموظف)', 'الفرع', 'الوظيفة / الدور', 'تاريخ يوم المعايشة / الشهر', 'تقييم رضا الأعضاء (NPS)', 'معدل الاحتفاظ بالأعضاء %', 'تحقيق تارجت المبيعات %', 'النتيجة النهائية من 100', 'القرار / التوصية'],
+    widths: [130, 150, 180, 155, 155, 185, 150, 185, 155, 150, 160],
+    currencyCols: [],
+    percentCols: [8, 9]
+  },
+  Weekly_Roster: {
+    tabColor: '#0d9488',
+    headers: ['معرف الموظف', 'اسم الموظف', 'الفرع', 'السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'إجمالي الساعات الأسبوعية'],
+    widths: [120, 175, 160, 145, 145, 145, 145, 145, 145, 145, 150],
+    currencyCols: [],
+    percentCols: []
+  },
+  Offboarding_Assets: {
+    tabColor: '#dc2626',
+    headers: ['معرف الإخلاء (ID)', 'تاريخ الإجراء', 'معرف الموظف', 'اسم الموظف', 'الفرع', 'نوع الإجراء', 'العهدة المستلمة', 'إيقاف بطاقة Smart Lock RFID', 'إيقاف صلاحية نظام BMS والواي فاي', 'تسوية المستحقات النهائية', 'الحالة'],
+    widths: [130, 120, 120, 175, 150, 170, 195, 175, 195, 155, 120],
+    currencyCols: [10],
+    percentCols: []
+  }
+};
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('🚀 نظام HR المساحة المشتركة')
+    .addItem('1️⃣ تهيئة وتنسيق جميع الشيتات تلقائياً (Setup & Auto-Format)', 'setupAndFormatDatabase')
+    .addItem('🖥️ فتح واجهة النظام التفاعلية', 'openAppModal')
+    .addToUi();
+}
+
+function openAppModal() {
+  const html = HtmlService.createHtmlOutputFromFile('index').setWidth(1280).setHeight(820);
+  SpreadsheetApp.getUi().showModalDialog(html, SYSTEM_CONFIG.APP_TITLE);
+}
+
+function doGet(e) {
+  if (e && e.parameter && e.parameter.action) {
+    return ContentService.createTextOutput(JSON.stringify(handleApiRequest(e.parameter.action, e.parameter)))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  return HtmlService.createHtmlOutputFromFile('index')
+    .setTitle(SYSTEM_CONFIG.APP_TITLE)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function doPost(e) {
+  const body = e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
+  const result = handleApiRequest(body.action, body.payload || body);
+  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function setupAndFormatDatabase() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss.setSpreadsheetTimeZone(SYSTEM_CONFIG.TIMEZONE);
+  ss.setSpreadsheetLocale('ar_EG');
+
+  Object.keys(SHEETS_SCHEMA).forEach(function(sheetName) {
+    const schema = SHEETS_SCHEMA[sheetName];
+    let sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+    sheet.setRightToLeft(true);
+    sheet.setTabColor(schema.tabColor);
+
+    const numCols = schema.headers.length;
+    const headerRange = sheet.getRange(1, 1, 1, numCols);
+    headerRange.setValues([schema.headers]);
+    sheet.setFrozenRows(1);
+    sheet.setRowHeight(1, 40);
+
+    headerRange
+      .setBackground(SYSTEM_CONFIG.HEADER_BG)
+      .setFontColor(SYSTEM_CONFIG.HEADER_FG)
+      .setFontFamily('Cairo')
+      .setFontSize(11)
+      .setFontWeight('bold')
+      .setHorizontalAlignment('center')
+      .setVerticalAlignment('middle')
+      .setWrap(true);
+
+    schema.widths.forEach(function(w, i) { sheet.setColumnWidth(i + 1, w); });
+
+    sheet.getBandings().forEach(function(b) { b.remove(); });
+    const maxRows = Math.max(sheet.getLastRow(), 50);
+    sheet.getRange(1, 1, maxRows, numCols).applyRowBanding(SpreadsheetApp.BandingTheme.TEAL, true, false);
+    sheet.getRange(2, 1, maxRows - 1, numCols).setFontFamily('Cairo').setFontSize(10).setHorizontalAlignment('center').setVerticalAlignment('middle');
+
+    schema.currencyCols.forEach(function(col) {
+      sheet.getRange(2, col, maxRows - 1, 1).setNumberFormat(SYSTEM_CONFIG.CURRENCY_FORMAT);
+    });
+    schema.percentCols.forEach(function(col) {
+      sheet.getRange(2, col, maxRows - 1, 1).setNumberFormat(SYSTEM_CONFIG.PERCENT_FORMAT);
+    });
+  });
+
+  SpreadsheetApp.flush();
+  return { ok: true, message: 'تم بناء وتنسيق جميع الشيتات التسعة بنجاح!' };
+}
+
+function handleApiRequest(action, payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (action === 'INIT_AND_FORMAT') return setupAndFormatDatabase();
+  const sheetMap = {
+    ADD_BRANCH: 'Branches',
+    ADD_EMPLOYEE: 'Employees',
+    LOG_ATTENDANCE: 'Shifts_Attendance',
+    RECORD_REVENUE_COMMISSION: 'Sales_Commissions',
+    GENERATE_PAYSLIP: 'Payroll_Slips',
+    SUBMIT_LEAVE: 'Leaves_Coverage',
+    SUBMIT_SHIFT_SWAP: 'Shift_Swaps_ESS',
+    ADD_ATS_KPI: 'ATS_KPIs',
+    INITIATE_OFFBOARDING: 'Offboarding_Assets'
+  };
+  const targetSheetName = sheetMap[action];
+  if (targetSheetName && payload && payload.rowArray) {
+    let sheet = ss.getSheetByName(targetSheetName);
+    if (!sheet) { setupAndFormatDatabase(); sheet = ss.getSheetByName(targetSheetName); }
+    sheet.appendRow(payload.rowArray);
+    sheet.setRowHeight(sheet.getLastRow(), 32);
+    return { ok: true, sheet: targetSheetName, row: sheet.getLastRow() };
+  }
+  return { ok: false, message: 'Unknown Action: ' + action };
+}`;
+
+    // 3. دالة إظهار الإشعارات الأنيقة (بدون alert)
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const colors = {
+        success: 'bg-emerald-900 border-emerald-500 text-white',
+        warning: 'bg-amber-900 border-amber-400 text-white',
+        danger: 'bg-rose-900 border-rose-500 text-white',
+        info: 'bg-slate-900 border-teal-400 text-white'
+      };
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto border-r-4 px-4 py-3 rounded-xl shadow-lg text-xs font-bold flex items-center justify-between gap-3 transition duration-300 ${colors[type] || colors.info}`;
+      toast.innerHTML = `<span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3800);
+    }
+
+    // 4. جسر المزامنة مع Google Sheets (يدعم google.script.run أو Fetch Web App URL)
+    function syncToGoogleSheetsBackend(action, rowArray, successLabel) {
+      const statusText = document.getElementById('syncStatusText');
+      statusText.textContent = 'جاري المزامنة مع Google Sheets...';
+
+      // أ) إذا كان يعمل داخل بيئة Google Apps Script HtmlService مباشرة
+      if (window.google && window.google.script && window.google.script.run) {
+        window.google.script.run
+          .withSuccessHandler(function() {
+            statusText.textContent = 'متصل ومزامن مع Google Sheets ✓';
+            showToast(successLabel + ' (تم الحفظ في Google Sheets)', 'success');
+          })
+          .withFailureHandler(function(err) {
+            statusText.textContent = 'خطأ في الاتصال بالشيت';
+            showToast('تعذر الحفظ في الشيت: ' + err.message, 'danger');
+          })
+          .handleApiRequest(action, { rowArray: rowArray });
+        return;
+      }
+
+      // ب) إذا أدخل المستخدم رابط Web App URL خارجي
+      if (APP_STATE.gasWebAppUrl) {
+        fetch(APP_STATE.gasWebAppUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: action, payload: { rowArray: rowArray } })
+        }).then(() => {
+          statusText.textContent = 'تم الإرسال إلى Google Sheets Web App ✓';
+          showToast(successLabel + ' (تم الإرسال للشيت)', 'success');
+        }).catch(() => {
+          statusText.textContent = 'يعمل محلياً (تحقق من رابط الـ Web App)';
+          showToast(successLabel + ' (حُفظ محلياً)', 'warning');
+        });
+        return;
+      }
+
+      // ج) الحفظ المحلي الفوري مع تحديث معاينة الشيتات
+      try {
+        localStorage.setItem('COWORK_HR_STATE_V1', JSON.stringify(APP_STATE));
+      } catch (e) {}
+      statusText.textContent = 'تم التحديث في جدول البيانات (جاهز للتصدير)';
+      showToast(successLabel, 'success');
+    }
+
+    // 5. حساب المسافة الجغرافية بالمتر (Haversine Formula للـ Geofencing)
+    function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const toRad = (deg) => (deg * Math.PI) / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return Math.round(R * c);
+    }
+
+    // 6. تنسيق الأرقام والعملات
+    function fmtMoney(val) {
+      return Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ج.م';
+    }
+
+    // 7. تعبئة قوائم الاختيار الديناميكية (Dropdowns)
+    function populateSelectDropdowns() {
+      const branchFilter = document.getElementById('globalBranchFilter');
+      const currentFilter = branchFilter.value || 'ALL';
+      branchFilter.innerHTML = '<option value="ALL">جميع الفروع (Multi-Branch Consolidated)</option>';
+
+      const branchSelectIds = ['empBranchSelect', 'commBranchSelect', 'attBranchSelect'];
+      branchSelectIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+      });
+
+      APP_STATE.branches.forEach(b => {
+        const optFilter = document.createElement('option');
+        optFilter.value = b.name;
+        optFilter.textContent = `${b.name} (${b.code})`;
+        branchFilter.appendChild(optFilter);
+
+        branchSelectIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            const opt = document.createElement('option');
+            opt.value = b.name;
+            opt.textContent = b.name;
+            el.appendChild(opt);
+          }
+        });
+      });
+      branchFilter.value = currentFilter;
+
+      const empSelectIds = [
+        'commPrimaryEmp',
+        'commSecondaryEmp',
+        'attEmployeeSelect',
+        'leaveEmpSelect',
+        'leaveReplacementSelect',
+        'swapRequesterSelect',
+        'swapTargetSelect',
+        'offEmpSelect',
+        'quickRosterEmpSelect',
+        'pdfEmployeeSelect'
+      ];
+
+      empSelectIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.innerHTML = '';
+        if (id === 'commSecondaryEmp') {
+          const noneOpt = document.createElement('option');
+          noneOpt.value = 'لا يوجد';
+          noneOpt.textContent = 'بدون موظف مساعد (100% للمغلق)';
+          el.appendChild(noneOpt);
+        }
+        if (id === 'leaveReplacementSelect') {
+          const noneRep = document.createElement('option');
+          noneRep.value = 'بدون بديل';
+          noneRep.textContent = '⚠️ بدون موظف بديل (اختبار فحص العجز)';
+          el.appendChild(noneRep);
+        }
+        APP_STATE.employees.filter(e => e.isActive !== false).forEach((emp, idx) => {
+          const opt = document.createElement('option');
+          opt.value = emp.name;
+          opt.textContent = `${emp.name} (${emp.role})`;
+          if (id === 'commPrimaryEmp' && idx === 1) opt.selected = true;
+          if (id === 'commSecondaryEmp' && idx === 2) opt.selected = true;
+          if (id === 'swapTargetSelect' && idx === 3) opt.selected = true;
+          el.appendChild(opt);
+        });
+      });
+    }
+
+    // 8. تحديث جميع الجداول والمؤشرات في الواجهة
+    function renderAllTablesAndKPIs() {
+      const branchFilter = APP_STATE.selectedBranch;
+      const filterByBranch = (itemBranch) => branchFilter === 'ALL' || itemBranch === branchFilter;
+
+      const filteredBranches = APP_STATE.branches.filter(b => filterByBranch(b.name));
+      const filteredEmployees = APP_STATE.employees.filter(e => filterByBranch(e.branch));
+      const filteredCommissions = APP_STATE.commissions.filter(c => filterByBranch(c.branch));
+      const filteredAttendance = APP_STATE.attendance.filter(a => filterByBranch(a.branch));
+      const filteredLeaves = APP_STATE.leaves.filter(l => filterByBranch(l.branch));
+
+      // تحديث بطاقات KPIs العلوية (تمييز الموظفين الأساسيين النشطين عن الملغيين المحفوظة بياناتهم)
+      const activeEmployeesList = filteredEmployees.filter(e => e.isActive !== false);
+      const archivedEmployeesCount = filteredEmployees.length - activeEmployeesList.length;
+      document.getElementById('kpiTotalEmployees').textContent = `${activeEmployeesList.length} نشط (${archivedEmployeesCount} محفوظ)`;
+      const roamingCount = activeEmployeesList.filter(e => e.roaming.includes('نعم')).length;
+      document.getElementById('kpiRoamingCount').textContent = `${roamingCount} موظفين نشطين متعددي الفروع`;
+
+      const totalRev = filteredBranches.reduce((acc, b) => acc + (b.monthlyRevenue || 0), 0);
+      document.getElementById('kpiTotalRevenue').textContent = fmtMoney(totalRev);
+
+      const avgOcc = filteredBranches.length
+        ? (filteredBranches.reduce((acc, b) => acc + b.occupancyPct, 0) / filteredBranches.length).toFixed(1)
+        : 0;
+      document.getElementById('kpiAverageOccupancy').textContent = `متوسط إشغال المكاتب: ${avgOcc}%`;
+
+      const totalComm = filteredCommissions.reduce((acc, c) => acc + c.totalCommission, 0);
+      document.getElementById('kpiTotalCommissions').textContent = fmtMoney(totalComm);
+
+      const totalDesks = filteredBranches.reduce((acc, b) => acc + b.totalDesks, 0);
+      document.getElementById('activeBranchMeta').textContent = `${filteredBranches.length} فروع نشطة • ${totalDesks} مكتب مشترك وخاص`;
+
+      // 1) جدول الفروع في لوحة القيادة
+      const branchTbody = document.getElementById('dashboardBranchesTableBody');
+      branchTbody.innerHTML = filteredBranches.map(b => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-bold text-teal-700 num-ltr">${b.code}</td>
+          <td class="p-3 font-bold text-slate-900">${b.name}</td>
+          <td class="p-3 num-ltr text-slate-600">${b.lat}, ${b.lng}</td>
+          <td class="p-3"><span class="bg-slate-100 px-2 py-0.5 rounded font-semibold">${b.radius} متر</span></td>
+          <td class="p-3"><span class="bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-bold">${b.is247}</span></td>
+          <td class="p-3 font-bold">${b.minFrontDesk} موظف استقبال</td>
+          <td class="p-3 font-bold">${b.totalDesks} مكتب</td>
+          <td class="p-3">
+            <span class="px-2 py-0.5 rounded font-bold ${b.occupancyPct >= 85 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+              ${b.occupancyPct}%
+            </span>
+          </td>
+          <td class="p-3 font-semibold text-slate-700">${b.manager}</td>
+        </tr>
+      `).join('');
+
+      // 2) جدول الموظفين الأساسيين والعقود (يعرض النشطين والملغيين المحفوظة بياناتهم)
+      const searchQ = (document.getElementById('searchEmployeeInput').value || '').trim().toLowerCase();
+      const empTbody = document.getElementById('employeesTableBody');
+      empTbody.innerHTML = filteredEmployees
+        .filter(e => !searchQ || e.name.toLowerCase().includes(searchQ) || e.role.toLowerCase().includes(searchQ))
+        .map(e => {
+          const active = e.isActive !== false;
+          return `
+          <tr class="${active ? 'hover:bg-slate-50' : 'bg-slate-100/80 text-slate-500'}">
+            <td class="p-2.5 font-bold num-ltr">${e.empNo}</td>
+            <td class="p-2.5 font-bold ${active ? 'text-slate-900' : 'line-through text-slate-500'}">${e.name}</td>
+            <td class="p-2.5">${e.branch}</td>
+            <td class="p-2.5"><span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-semibold">${e.role}</span></td>
+            <td class="p-2.5">${e.contractType}</td>
+            <td class="p-2.5 font-bold text-teal-700">${e.baseSalary > 0 ? fmtMoney(e.baseSalary) : fmtMoney(e.hourlyRate) + '/ساعة'}</td>
+            <td class="p-2.5">
+              <span class="px-2 py-0.5 rounded font-bold ${e.roaming.includes('نعم') ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}">
+                ${e.roaming}
+              </span>
+            </td>
+            <td class="p-2.5">${e.costAllocation}</td>
+            <td class="p-2.5">
+              <span class="px-2 py-0.5 rounded font-bold ${active ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                ${active ? 'نشط (ACTIVE)' : 'ملغي - محفوظ البيانات'}
+              </span>
+            </td>
+            <td class="p-2.5 text-center">
+              <button type="button" data-toggle-emp-id="${e.id}" class="btn-toggle-emp-active px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${active ? 'bg-rose-100 hover:bg-rose-200 text-rose-800' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}">
+                ${active ? '🚫 إلغاء (مع حفظ البيانات)' : '♻️ إعادة تفعيل للجدول'}
+              </button>
+            </td>
+          </tr>
+        `;
+        }).join('');
+
+      // 3) جدول العمولات
+      const commTbody = document.getElementById('commissionsTableBody');
+      commTbody.innerHTML = filteredCommissions.map(c => {
+        const isClawback = c.totalCommission < 0;
+        return `
+          <tr class="hover:bg-slate-50 ${isClawback ? 'bg-rose-50/50' : ''}">
+            <td class="p-2.5 font-bold num-ltr">${c.invoiceNo}</td>
+            <td class="p-2.5 font-bold text-slate-900">${c.clientName}</td>
+            <td class="p-2.5">${c.productCategory} <span class="text-slate-400">(${c.months} ش)</span></td>
+            <td class="p-2.5 font-semibold num-ltr">${fmtMoney(c.netAmount)}</td>
+            <td class="p-2.5 font-bold text-teal-700 num-ltr">${c.ratePct}%</td>
+            <td class="p-2.5">${c.primaryEmp} <span class="text-emerald-700 font-bold">(${fmtMoney(c.primaryAmount)})</span></td>
+            <td class="p-2.5">${c.secondaryEmp} <span class="text-blue-700 font-bold">(${fmtMoney(c.secondaryAmount)})</span></td>
+            <td class="p-2.5 font-extrabold ${isClawback ? 'text-rose-600' : 'text-emerald-700'} num-ltr">${fmtMoney(c.totalCommission)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      // 4) جدول مسير الرواتب (Payroll_Slips)
+      renderPayrollTable(filteredEmployees);
+
+      // 5) جدول الحضور والـ Geofencing
+      const attTbody = document.getElementById('attendanceTableBody');
+      attTbody.innerHTML = filteredAttendance.map(a => {
+        const inside = a.geofenceStatus.includes('داخل');
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="p-2.5 num-ltr font-semibold">${a.date}</td>
+            <td class="p-2.5 font-bold text-slate-900">${a.empName}</td>
+            <td class="p-2.5">${a.branch}</td>
+            <td class="p-2.5">${a.shift}</td>
+            <td class="p-2.5 font-bold">${a.workedHours} س <span class="text-amber-600">(+${a.overtimeHours} إضافي)</span></td>
+            <td class="p-2.5 font-bold num-ltr">${a.distanceM} متر</td>
+            <td class="p-2.5">
+              <span class="px-2 py-0.5 rounded font-bold ${inside ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                ${a.geofenceStatus}
+              </span>
+            </td>
+            <td class="p-2.5"><span class="bg-slate-100 px-2 py-0.5 rounded font-semibold">${a.mode}</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      // 6) جدول الإجازات وفحص التغطية
+      const leavesTbody = document.getElementById('leavesTableBody');
+      leavesTbody.innerHTML = filteredLeaves.map((l, idx) => {
+        const isSafe = l.coverageCheck.includes('آمن');
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="p-2.5 font-bold text-slate-900">${l.empName}</td>
+            <td class="p-2.5">${l.branch} • <span class="text-slate-500">${l.role}</span></td>
+            <td class="p-2.5">${l.leaveType}</td>
+            <td class="p-2.5 num-ltr">${l.startDate} → ${l.endDate} (${l.days} يوم)</td>
+            <td class="p-2.5 font-semibold text-teal-700">${l.replacement}</td>
+            <td class="p-2.5">
+              <span class="px-2 py-0.5 rounded font-bold ${isSafe ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                ${l.coverageCheck}
+              </span>
+            </td>
+            <td class="p-2.5 font-bold">${l.status}</td>
+            <td class="p-2.5">
+              <button type="button" data-leave-idx="${idx}" class="btn-approve-leave bg-teal-600 hover:bg-teal-500 text-white px-2.5 py-1 rounded text-[11px] font-bold">
+                اعتماد / تبديل
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // 7) جدول تبديل الورديات (Shift Swaps)
+      const swapsTbody = document.getElementById('swapsTableBody');
+      swapsTbody.innerHTML = APP_STATE.shiftSwaps.map(s => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-2.5 font-bold text-slate-900">${s.requester}</td>
+          <td class="p-2.5 text-slate-700">${s.requesterShift}</td>
+          <td class="p-2.5 font-bold text-indigo-700">${s.targetPeer}</td>
+          <td class="p-2.5 text-slate-700">${s.targetShift}</td>
+          <td class="p-2.5"><span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">${s.doubleShiftCheck}</span></td>
+          <td class="p-2.5 font-bold text-emerald-700">${s.peerStatus}</td>
+          <td class="p-2.5"><span class="bg-teal-100 text-teal-800 px-2 py-0.5 rounded font-bold">${s.managerStatus}</span></td>
+        </tr>
+      `).join('');
+
+      // 8) جدول التوظيف والأداء (ATS & KPIs)
+      const atsTbody = document.getElementById('atsKpiTableBody');
+      atsTbody.innerHTML = APP_STATE.atsKpis.map(k => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-2"><span class="bg-sky-50 text-sky-800 px-2 py-0.5 rounded font-bold">${k.type}</span></td>
+          <td class="p-2 font-bold text-slate-900">${k.name}</td>
+          <td class="p-2">${k.branch}</td>
+          <td class="p-2 font-bold text-emerald-700 num-ltr">${k.nps}</td>
+          <td class="p-2 font-bold text-teal-700 num-ltr">${k.retentionPct}%</td>
+          <td class="p-2 font-extrabold num-ltr">${k.finalScore}/100</td>
+          <td class="p-2 font-semibold text-slate-800">${k.decision}</td>
+        </tr>
+      `).join('');
+
+      // 9) جدول إخلاء الطرف السريع
+      const offTbody = document.getElementById('offboardingTableBody');
+      offTbody.innerHTML = APP_STATE.offboarding.map(o => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-2 font-bold text-slate-900">${o.empName}</td>
+          <td class="p-2">${o.actionType}</td>
+          <td class="p-2">${o.assets}</td>
+          <td class="p-2"><span class="bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-bold">${o.rfidStatus}</span></td>
+          <td class="p-2"><span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold">${o.bmsStatus}</span></td>
+          <td class="p-2 font-bold num-ltr">${fmtMoney(o.settlement)}</td>
+        </tr>
+      `).join('');
+
+      renderWeeklyRosterTable();
+      renderLiveShiftHeadcountMonitor();
+      renderEmployeePdfCard();
+      updateCharts();
+    }
+
+    // 9. محرك احتساب الرواتب والعمولات والضرائب والتأمينات
+    function renderPayrollTable(employeesList) {
+      const tbody = document.getElementById('payrollTableBody');
+      tbody.innerHTML = employeesList.map(emp => {
+        const isHourly = emp.contractType.includes('PART_TIME');
+        const baseEarned = isHourly ? emp.hourlyRate * 160 : emp.baseSalary;
+
+        // جمع ساعات العمل الإضافي للموظف
+        const empOvertimeHours = APP_STATE.attendance
+          .filter(a => a.empName === emp.name)
+          .reduce((sum, a) => sum + (a.overtimeHours || 0), 0);
+        const hourEquivalent = isHourly ? emp.hourlyRate : emp.baseSalary / 240;
+        const overtimePay = Math.round(empOvertimeHours * hourEquivalent * 1.35);
+
+        // جمع العمولات الإيجابية للموظف (سواء كان مغلقاً أو مساعداً في جولة)
+        let positiveComm = 0;
+        let clawbackDeduction = 0;
+        APP_STATE.commissions.forEach(c => {
+          if (c.primaryEmp === emp.name) {
+            if (c.primaryAmount >= 0) positiveComm += c.primaryAmount;
+            else clawbackDeduction += Math.abs(c.primaryAmount);
+          }
+          if (c.secondaryEmp === emp.name && c.secondaryAmount > 0) {
+            positiveComm += c.secondaryAmount;
+          }
+        });
+
+        // حافز إشغال الفرع لمدير المجتمع إذا تجاوز إشغال فرعه 85%
+        const empBranchObj = APP_STATE.branches.find(b => b.name === emp.branch);
+        const occupancyBonus = (emp.role === 'Community Manager' && empBranchObj && empBranchObj.occupancyPct >= 85) ? 1500 : 0;
+
+        const gross = baseEarned + overtimePay + positiveComm + occupancyBonus;
+        const socialInsurance = emp.insured === 'نعم' ? Math.round(baseEarned * 0.11) : 0;
+        const taxableBase = Math.max(0, gross - socialInsurance - 2500);
+        const incomeTax = Math.round(taxableBase * 0.10);
+        const netPay = gross - socialInsurance - incomeTax - clawbackDeduction;
+
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="p-2.5 font-bold text-slate-900">${emp.name}</td>
+            <td class="p-2.5">${emp.branch}<br/><span class="text-[11px] text-slate-500">${emp.contractType}</span></td>
+            <td class="p-2.5 font-semibold num-ltr">${fmtMoney(baseEarned)}</td>
+            <td class="p-2.5 text-amber-700 font-bold num-ltr">${fmtMoney(overtimePay)}</td>
+            <td class="p-2.5 text-emerald-700 font-bold num-ltr">${fmtMoney(positiveComm + occupancyBonus)}</td>
+            <td class="p-2.5 font-bold num-ltr">${fmtMoney(gross)}</td>
+            <td class="p-2.5 text-slate-600 num-ltr">${fmtMoney(socialInsurance + incomeTax)}</td>
+            <td class="p-2.5 text-rose-600 font-bold num-ltr">${clawbackDeduction > 0 ? '-' + fmtMoney(clawbackDeduction) : '0 ج.م'}</td>
+            <td class="p-2.5 font-extrabold text-teal-800 bg-teal-50/60 num-ltr">${fmtMoney(netPay)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 10. تحديث معاينة حاسبة العمولة الفورية
+    function updateCommissionPreview() {
+      const catSelect = document.getElementById('commProductCategory');
+      const baseRate = parseFloat(catSelect.options[catSelect.selectedIndex].getAttribute('data-base-rate') || '4');
+      const months = parseInt(document.getElementById('commContractMonths').value || '1', 10);
+      const eventType = document.getElementById('commEventType').value;
+      const netAmount = parseFloat(document.getElementById('commNetAmount').value || '0');
+      let primarySplit = parseFloat(document.getElementById('commPrimarySplit').value || '75');
+      const secondaryEmp = document.getElementById('commSecondaryEmp').value;
+
+      if (secondaryEmp === 'لا يوجد') {
+        primarySplit = 100;
+        document.getElementById('commPrimarySplit').value = 100;
+      }
+      const secondarySplit = Math.max(0, 100 - primarySplit);
+      document.getElementById('commSecondarySplit').value = secondarySplit;
+
+      let bonusRate = 0;
+      if (months >= 12) bonusRate = 3.0;
+      else if (months >= 6) bonusRate = 1.5;
+
+      const finalRate = baseRate + bonusRate;
+      const sign = eventType.includes('CLAWBACK') ? -1 : 1;
+      const totalComm = Math.round((netAmount * (finalRate / 100)) * sign);
+      const primaryShare = Math.round(totalComm * (primarySplit / 100));
+      const secondaryShare = totalComm - primaryShare;
+
+      document.getElementById('previewCommRate').textContent = `${finalRate.toFixed(1)}%`;
+      document.getElementById('previewCommTotal').textContent = fmtMoney(totalComm);
+      document.getElementById('previewPrimaryShare').textContent = `حصة الأساسي (${primarySplit}%): ${fmtMoney(primaryShare)}`;
+      document.getElementById('previewSecondaryShare').textContent = `حصة المساعد (${secondarySplit}%): ${fmtMoney(secondaryShare)}`;
+
+      return { finalRate, totalComm, primaryShare, secondaryShare, primarySplit, secondarySplit, months };
+    }
+
+    // 11. تحديث فحص الـ Geofence المباشر
+    function updateGeofencePreview() {
+      const branchName = document.getElementById('attBranchSelect').value;
+      const empName = document.getElementById('attEmployeeSelect').value;
+      const lat = parseFloat(document.getElementById('attInputLat').value || '31.2156');
+      const lng = parseFloat(document.getElementById('attInputLng').value || '29.9553');
+
+      const branch = APP_STATE.branches.find(b => b.name === branchName) || APP_STATE.branches[0];
+      const emp = APP_STATE.employees.find(e => e.name === empName) || APP_STATE.employees[0];
+      const dist = calculateDistanceMeters(lat, lng, branch.lat, branch.lng);
+      const inside = dist <= branch.radius;
+
+      const box = document.getElementById('geofenceLiveResult');
+      const badge = document.getElementById('geoStatusBadge');
+      const note = document.getElementById('geoRoamingNote');
+
+      if (inside) {
+        box.className = 'p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-1';
+        badge.className = 'bg-emerald-600 text-white px-2 py-0.5 rounded text-[11px]';
+        badge.textContent = `داخل النطاق (${dist} متر / المسموح ${branch.radius}م)`;
+      } else {
+        box.className = 'p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 space-y-1';
+        badge.className = 'bg-rose-600 text-white px-2 py-0.5 rounded text-[11px]';
+        badge.textContent = `خارج النطاق! (${dist} متر / المسموح ${branch.radius}م)`;
+      }
+
+      if (emp.branch === branch.name) {
+        note.textContent = 'حضور في الفرع الأساسي للموظف.';
+      } else if (emp.roaming.includes('نعم')) {
+        note.textContent = 'تغطية متنقلة (Roaming Staff) مصرح بها في هذا الفرع.';
+      } else {
+        note.textContent = 'تنبيه: هذا الفرع ليس الفرع الأساسي للموظف وغير مفعل له Roaming!';
+      }
+
+      return { dist, inside, branch, emp };
+    }
+
+    // 12. الرسوم البيانية (Chart.js)
+    let branchChartInstance = null;
+    let footfallChartInstance = null;
+
+    function updateCharts() {
+      const ctx1 = document.getElementById('chartBranchLaborVsRev');
+      const ctx2 = document.getElementById('chartFootfallVsStaff');
+      if (!ctx1 || !ctx2 || typeof Chart === 'undefined') return;
+
+      const labels = APP_STATE.branches.map(b => b.name.replace('فرع ', ''));
+      const revenues = APP_STATE.branches.map(b => b.monthlyRevenue);
+      const laborCosts = APP_STATE.branches.map(b => {
+        const branchEmps = APP_STATE.employees.filter(e => e.branch === b.name);
+        const salaries = branchEmps.reduce((s, e) => s + (e.baseSalary > 0 ? e.baseSalary : e.hourlyRate * 160), 0);
+        const comms = APP_STATE.commissions.filter(c => c.branch === b.name && c.totalCommission > 0).reduce((s, c) => s + c.totalCommission, 0);
+        return salaries + comms + 15000;
+      });
+
+      if (branchChartInstance) branchChartInstance.destroy();
+      branchChartInstance = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'إيرادات الفرع الشهرية (ج.م)',
+              data: revenues,
+              backgroundColor: '#0d9488',
+              borderRadius: 8
+            },
+            {
+              label: 'تكلفة الرواتب والعمولات (ج.م)',
+              data: laborCosts,
+              backgroundColor: '#f59e0b',
+              borderRadius: 8
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { font: { family: 'Cairo' } } } }
+        }
+      });
+
+      if (footfallChartInstance) footfallChartInstance.destroy();
+      footfallChartInstance = new Chart(ctx2, {
+        type: 'line',
+        data: {
+          labels: ['8 ص', '10 ص', '12 م', '2 م', '4 م', '6 م', '8 م', '10 م', '2 ص (ليلي)'],
+          datasets: [
+            {
+              label: 'عدد الأعضاء المتواجدين بالمساحة (Member Footfall)',
+              data: [45, 115, 165, 180, 155, 130, 95, 55, 22],
+              borderColor: '#2563eb',
+              backgroundColor: 'rgba(37, 99, 235, 0.12)',
+              fill: true,
+              tension: 0.35
+            },
+            {
+              label: 'طاقة تغطية فريق التشغيل والاستقبال (مضروبة ×25 عضو/موظف)',
+              data: [75, 125, 175, 175, 150, 150, 100, 75, 50],
+              borderColor: '#10b981',
+              borderDash: [5, 5],
+              fill: false,
+              tension: 0.35
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { font: { family: 'Cairo' } } } }
+        }
+      });
+    }
+
+    // 13. معاينة جداول Google Sheets التسعة بعد التنسيق التلقائي
+    const PREVIEW_SHEETS_META = [
+      { key: 'Branches', label: '1. Branches', headers: ['معرف الفرع', 'كود الفرع', 'اسم الفرع', 'إحداثيات Lat,Lng', 'نطاق البصمة', '24/7', 'الحد الأدنى للاستقبال', 'الإشغال %', 'الحالة'] },
+      { key: 'Employees', label: '2. Employees', headers: ['الرقم الوظيفي', 'الاسم الكامل', 'الفرع الأساسي', 'الدور الوظيفي', 'نوع العقد', 'الراتب/الساعة', 'Roaming', 'توزيع التكلفة', 'الحالة'] },
+      { key: 'Sales_Commissions', label: '3. Sales_Commissions', headers: ['رقم الفاتورة', 'العضو/الشركة', 'الفرع', 'المنتج', 'صافي الفاتورة', 'النسبة %', 'المغلق (Closer)', 'المساعد (Host)', 'العمولة'] },
+      { key: 'Shifts_Attendance', label: '4. Shifts_Attendance', headers: ['التاريخ', 'الموظف', 'الفرع', 'الوردية', 'الساعات', 'المسافة (متر)', 'حالة الـ Geofence', 'نمط الحضور'] },
+      { key: 'Leaves_Coverage', label: '5. Leaves_Coverage', headers: ['الموظف', 'الفرع', 'نوع الإجازة', 'الأيام', 'الموظف البديل', 'فحص التغطية الآلي', 'الحالة'] }
+    ];
+
+    function renderSheetPreview(sheetKey = 'Branches') {
+      const selector = document.getElementById('sheetTabsSelector');
+      selector.innerHTML = PREVIEW_SHEETS_META.map(s => `
+        <button type="button" data-sheet-key="${s.key}" class="btn-sheet-preview px-3 py-1 rounded-lg text-xs font-bold transition ${s.key === sheetKey ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+          ${s.label}
+        </button>
+      `).join('');
+
+      const meta = PREVIEW_SHEETS_META.find(s => s.key === sheetKey) || PREVIEW_SHEETS_META[0];
+      document.getElementById('sheetPreviewThead').innerHTML = `
+        <tr class="sheet-preview-header">
+          ${meta.headers.map(h => `<th class="p-2.5 border border-slate-700 text-center">${h}</th>`).join('')}
+        </tr>
+      `;
+
+      let rowsHtml = '';
+      if (sheetKey === 'Branches') {
+        rowsHtml = APP_STATE.branches.map(b => `
+          <tr class="sheet-preview-row text-center">
+            <td class="p-2 border border-slate-200 num-ltr">${b.id}</td>
+            <td class="p-2 border border-slate-200 font-bold num-ltr">${b.code}</td>
+            <td class="p-2 border border-slate-200 font-bold">${b.name}</td>
+            <td class="p-2 border border-slate-200 num-ltr">${b.lat}, ${b.lng}</td>
+            <td class="p-2 border border-slate-200">${b.radius} م</td>
+            <td class="p-2 border border-slate-200">${b.is247}</td>
+            <td class="p-2 border border-slate-200 font-bold">${b.minFrontDesk}</td>
+            <td class="p-2 border border-slate-200 font-bold text-teal-800">${b.occupancyPct}%</td>
+            <td class="p-2 border border-slate-200 bg-emerald-100 text-emerald-800 font-bold">${b.status}</td>
+          </tr>
+        `).join('');
+      } else if (sheetKey === 'Employees') {
+        rowsHtml = APP_STATE.employees.map(e => `
+          <tr class="sheet-preview-row text-center">
+            <td class="p-2 border border-slate-200 num-ltr">${e.empNo}</td>
+            <td class="p-2 border border-slate-200 font-bold">${e.name}</td>
+            <td class="p-2 border border-slate-200">${e.branch}</td>
+            <td class="p-2 border border-slate-200">${e.role}</td>
+            <td class="p-2 border border-slate-200">${e.contractType}</td>
+            <td class="p-2 border border-slate-200 font-bold">${e.baseSalary > 0 ? fmtMoney(e.baseSalary) : fmtMoney(e.hourlyRate) + '/س'}</td>
+            <td class="p-2 border border-slate-200 bg-amber-100 text-amber-900 font-bold">${e.roaming}</td>
+            <td class="p-2 border border-slate-200">${e.costAllocation}</td>
+            <td class="p-2 border border-slate-200 bg-emerald-100 text-emerald-800 font-bold">${e.status}</td>
+          </tr>
+        `).join('');
+      } else if (sheetKey === 'Sales_Commissions') {
+        rowsHtml = APP_STATE.commissions.map(c => `
+          <tr class="sheet-preview-row text-center">
+            <td class="p-2 border border-slate-200 num-ltr font-bold">${c.invoiceNo}</td>
+            <td class="p-2 border border-slate-200 font-bold">${c.clientName}</td>
+            <td class="p-2 border border-slate-200">${c.branch}</td>
+            <td class="p-2 border border-slate-200">${c.productCategory}</td>
+            <td class="p-2 border border-slate-200 num-ltr">${fmtMoney(c.netAmount)}</td>
+            <td class="p-2 border border-slate-200 font-bold">${c.ratePct}%</td>
+            <td class="p-2 border border-slate-200">${c.primaryEmp} (${fmtMoney(c.primaryAmount)})</td>
+            <td class="p-2 border border-slate-200">${c.secondaryEmp} (${fmtMoney(c.secondaryAmount)})</td>
+            <td class="p-2 border border-slate-200 font-bold ${c.totalCommission < 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">${fmtMoney(c.totalCommission)}</td>
+          </tr>
+        `).join('');
+      } else if (sheetKey === 'Shifts_Attendance') {
+        rowsHtml = APP_STATE.attendance.map(a => `
+          <tr class="sheet-preview-row text-center">
+            <td class="p-2 border border-slate-200 num-ltr">${a.date}</td>
+            <td class="p-2 border border-slate-200 font-bold">${a.empName}</td>
+            <td class="p-2 border border-slate-200">${a.branch}</td>
+            <td class="p-2 border border-slate-200">${a.shift}</td>
+            <td class="p-2 border border-slate-200">${a.workedHours} س (+${a.overtimeHours})</td>
+            <td class="p-2 border border-slate-200 font-bold">${a.distanceM} م</td>
+            <td class="p-2 border border-slate-200 font-bold ${a.geofenceStatus.includes('داخل') ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">${a.geofenceStatus}</td>
+            <td class="p-2 border border-slate-200">${a.mode}</td>
+          </tr>
+        `).join('');
+      } else {
+        rowsHtml = APP_STATE.leaves.map(l => `
+          <tr class="sheet-preview-row text-center">
+            <td class="p-2 border border-slate-200 font-bold">${l.empName}</td>
+            <td class="p-2 border border-slate-200">${l.branch}</td>
+            <td class="p-2 border border-slate-200">${l.leaveType}</td>
+            <td class="p-2 border border-slate-200">${l.days} يوم</td>
+            <td class="p-2 border border-slate-200">${l.replacement}</td>
+            <td class="p-2 border border-slate-200 font-bold ${l.coverageCheck.includes('آمن') ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">${l.coverageCheck}</td>
+            <td class="p-2 border border-slate-200 font-bold">${l.status}</td>
+          </tr>
+        `).join('');
+      }
+
+      document.getElementById('sheetPreviewTbody').innerHTML = rowsHtml;
+    }
+
+    // 14. نسخ كود Google Apps Script للحافظة
+    function copyGasCodeToClipboard() {
+      const copyFallback = (text) => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(GAS_BACKEND_SOURCE_CODE).catch(() => copyFallback(GAS_BACKEND_SOURCE_CODE));
+      } else {
+        copyFallback(GAS_BACKEND_SOURCE_CODE);
+      }
+      document.getElementById('copyBtnText').textContent = '✅ تم نسخ كود Code.gs بنجاح!';
+      showToast('تم نسخ كود Google Apps Script بالكامل إلى الحافظة', 'success');
+      setTimeout(() => {
+        document.getElementById('copyBtnText').textContent = 'نسخ كود Code.gs بالكامل';
+      }, 3000);
+    }
+
+    // 14-B. ضمان وجود جدول أسبوعي لكل موظف
+    function ensureEmployeeRoster(empId, idx) {
+      if (!APP_STATE.weeklyRoster[empId]) {
+        const patterns = ['8H_8_4', '8H_3_11', '12H_8_8', '12H_11_11'];
+        const p = patterns[idx % patterns.length];
+        APP_STATE.weeklyRoster[empId] = {
+          sat: p, sun: p, mon: p, tue: p, wed: p, thu: p, fri: 'OFF'
+        };
+      }
+      return APP_STATE.weeklyRoster[empId];
+    }
+
+    // 14-C. رسم جدول تنظيم الشفتات الأسبوعي + كاشف التغطية اليومية وأيام المشاكل + قائمة الموظفين الأساسيين
+    function renderWeeklyRosterTable() {
+      const tbody = document.getElementById('weeklyRosterTableBody');
+      const tfoot = document.getElementById('weeklyRosterTableFoot');
+      const dailyCardsGrid = document.getElementById('dailyCoverageCardsGrid');
+      const coreMasterTbody = document.getElementById('coreMasterStaffTableBody');
+      if (!tbody) return;
+
+      const branchFilter = APP_STATE.selectedBranch;
+      const allBranchEmps = APP_STATE.employees.filter(e => branchFilter === 'ALL' || e.branch === branchFilter);
+      // الموظفون الأساسيون النشطون هم فقط الذين يتحركون في جدول الشفتات
+      const activeEmps = allBranchEmps.filter(e => e.isActive !== false);
+      const archivedEmps = allBranchEmps.filter(e => e.isActive === false);
+      const shiftKeys = Object.keys(APP_STATE.shiftCatalog);
+
+      // تحديث شارة عداد الموظفين الأساسيين
+      const coreBadge = document.getElementById('coreStaffCountersBadge');
+      if (coreBadge) {
+        coreBadge.textContent = `${activeEmps.length} موظفين أساسيين نشطين في الجدول | ${archivedEmps.length} ملغي (محفوظ البيانات)`;
+      }
+
+      // 1) رسم صفوف الموظفين الأساسيين النشطين في جدول الأسبوع
+      tbody.innerHTML = activeEmps.map((emp, idx) => {
+        const roster = ensureEmployeeRoster(emp.id, idx);
+        let totalHours = 0;
+
+        const dayCellsHtml = APP_STATE.daysList.map(d => {
+          const shiftCode = roster[d.key] || 'OFF';
+          const shiftObj = APP_STATE.shiftCatalog[shiftCode] || APP_STATE.shiftCatalog.OFF;
+          totalHours += shiftObj.hours;
+
+          const optionsHtml = shiftKeys.map(k => {
+            const s = APP_STATE.shiftCatalog[k];
+            return `<option value="${k}" ${k === shiftCode ? 'selected' : ''}>${s.shortLabel}</option>`;
+          }).join('');
+
+          return `
+            <td class="p-1.5 text-center">
+              <select data-emp-id="${emp.id}" data-day-key="${d.key}" class="roster-cell-select w-full text-[11px] font-bold rounded-lg px-1.5 py-1.5 border cursor-pointer focus:outline-none ${shiftObj.badgeClass}">
+                ${optionsHtml}
+              </select>
+            </td>
+          `;
+        }).join('');
+
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="p-2.5">
+              <div class="font-extrabold text-slate-900">${emp.name}</div>
+              <div class="text-[11px] text-slate-500">${emp.branch} • ${emp.role}</div>
+            </td>
+            ${dayCellsHtml}
+            <td class="p-2.5 text-center">
+              <span class="bg-slate-900 text-white font-extrabold px-2.5 py-1 rounded-lg num-ltr">${totalHours} س</span>
+            </td>
+            <td class="p-2.5 text-center">
+              <div class="flex items-center justify-center gap-1">
+                <button type="button" data-pdf-emp="${emp.name}" class="btn-row-export-pdf bg-rose-600 hover:bg-rose-500 text-white font-bold px-2 py-1 rounded-lg text-[11px] shadow transition" title="تصدير جدول الموظف PDF">
+                  📄 PDF
+                </button>
+                <button type="button" data-toggle-emp-id="${emp.id}" class="btn-toggle-emp-active bg-slate-200 hover:bg-rose-100 text-slate-700 hover:text-rose-800 font-bold px-2 py-1 rounded-lg text-[11px] transition" title="إلغاء من الجدول مع حفظ كامل بياناته">
+                  🚫 إلغاء
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // 2) حساب أعداد الموظفين في كل يوم وكشف أيام المشاكل والعجز
+      const minRequiredInput = document.getElementById('minDailyStaffInput');
+      const minDailyRequired = minRequiredInput ? parseInt(minRequiredInput.value || '4', 10) : 4;
+      let problemDaysList = [];
+
+      const dailyStats = APP_STATE.daysList.map(d => {
+        let totalWorking = 0;
+        let morningCover = 0; // شفت 8ص-4م أو 8ص-8م
+        let eveningCover = 0; // شفت 3م-11م أو 11ص-11م
+        let offCount = 0;
+        let totalDayHours = 0;
+
+        activeEmps.forEach((emp, idx) => {
+          const roster = ensureEmployeeRoster(emp.id, idx);
+          const code = roster[d.key] || 'OFF';
+          const sObj = APP_STATE.shiftCatalog[code] || APP_STATE.shiftCatalog.OFF;
+          if (code === 'OFF') {
+            offCount++;
+          } else {
+            totalWorking++;
+            totalDayHours += sObj.hours;
+            if (code === '8H_8_4' || code === '12H_8_8') morningCover++;
+            if (code === '8H_3_11' || code === '12H_11_11') eveningCover++;
+          }
+        });
+
+        const issues = [];
+        if (totalWorking < minDailyRequired) {
+          issues.push(`عجز عدد (${totalWorking}/${minDailyRequired})`);
+        }
+        if (morningCover === 0) {
+          issues.push('لا يوجد شفت صباحي!');
+        }
+        if (eveningCover === 0) {
+          issues.push('لا يوجد شفت مسائي!');
+        }
+
+        const hasProblem = issues.length > 0;
+        if (hasProblem) problemDaysList.push(d.name);
+
+        return {
+          dayKey: d.key,
+          dayName: d.name,
+          totalWorking,
+          morningCover,
+          eveningCover,
+          offCount,
+          totalDayHours,
+          hasProblem,
+          issuesText: hasProblem ? issues.join(' + ') : 'تغطية مكتملة وآمنة'
+        };
+      });
+
+      // تحديث شارة ملخص مشاكل الأسبوع
+      const summaryBadge = document.getElementById('weeklyProblemsSummaryBadge');
+      if (summaryBadge) {
+        if (problemDaysList.length === 0) {
+          summaryBadge.className = 'px-3 py-1.5 rounded-lg font-extrabold text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+          summaryBadge.textContent = '✅ جميع أيام الأسبوع مغطاة بالكامل بلا أي عجز';
+        } else {
+          summaryBadge.className = 'px-3 py-1.5 rounded-lg font-extrabold text-xs bg-rose-500/30 text-rose-200 border border-rose-400';
+          summaryBadge.textContent = `🚨 انتبه! يوجد عجز/مشكلة في (${problemDaysList.length}) أيام: ${problemDaysList.join('، ')}`;
+        }
+      }
+
+      // رسم بطاقات التغطية اليومية السبعة أعلى الجدول
+      if (dailyCardsGrid) {
+        dailyCardsGrid.innerHTML = dailyStats.map(st => `
+          <div class="p-3 rounded-xl border transition ${st.hasProblem ? 'bg-rose-950/90 border-rose-500 text-white shadow-md' : 'bg-slate-800/90 border-teal-500/40 text-white'}">
+            <div class="flex items-center justify-between border-b ${st.hasProblem ? 'border-rose-800' : 'border-slate-700'} pb-1.5 mb-2">
+              <span class="font-extrabold text-sm">${st.dayName}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${st.hasProblem ? 'bg-rose-500 text-white' : 'bg-emerald-400 text-slate-950'}">
+                ${st.hasProblem ? '🚨 مشكلة' : '✅ تمام'}
+              </span>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="text-[11px] text-slate-300">المتواجدون باليوم:</span>
+              <span class="text-xl font-extrabold num-ltr ${st.hasProblem ? 'text-rose-300' : 'text-teal-300'}">${st.totalWorking} <span class="text-[10px] font-normal">/ ${minDailyRequired}</span></span>
+            </div>
+            <div class="grid grid-cols-3 gap-1 text-[10px] text-center mt-2 pt-1.5 border-t ${st.hasProblem ? 'border-rose-800/80' : 'border-slate-700/80'}">
+              <div class="bg-slate-900/80 rounded py-1">
+                <div class="text-teal-300 font-bold num-ltr">${st.morningCover}</div>
+                <div class="text-slate-400">صباحي</div>
+              </div>
+              <div class="bg-slate-900/80 rounded py-1">
+                <div class="text-sky-300 font-bold num-ltr">${st.eveningCover}</div>
+                <div class="text-slate-400">مسائي</div>
+              </div>
+              <div class="bg-slate-900/80 rounded py-1">
+                <div class="text-slate-300 font-bold num-ltr">${st.offCount}</div>
+                <div class="text-slate-400">إجازة</div>
+              </div>
+            </div>
+            <div class="mt-2 text-[10px] font-bold truncate ${st.hasProblem ? 'text-amber-300' : 'text-emerald-300'}">
+              ${st.issuesText}
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // رسم صف الإجمالي السفلي (tfoot) مباشرة تحت أعمدة الأيام في نفس الجدول
+      if (tfoot) {
+        const totalWeekAllHours = dailyStats.reduce((s, d) => s + d.totalDayHours, 0);
+        tfoot.innerHTML = `
+          <tr>
+            <td class="p-3 font-extrabold text-teal-300">
+              📊 إجمالي المتواجدين كل يوم<br/>
+              <span class="text-[10px] text-slate-400 font-normal">الحد الأدنى المطلوب: ${minDailyRequired} موظفين/يوم</span>
+            </td>
+            ${dailyStats.map(st => `
+              <td class="p-2 text-center ${st.hasProblem ? 'bg-rose-950/95 text-rose-200' : 'bg-slate-900 text-white'}">
+                <div class="text-sm font-extrabold num-ltr">${st.totalWorking} موظف</div>
+                <div class="text-[10px] text-slate-300">ص:${st.morningCover} | م:${st.eveningCover} | إجازة:${st.offCount}</div>
+                <div class="mt-1 inline-block px-2 py-0.5 rounded text-[10px] font-extrabold ${st.hasProblem ? 'bg-rose-600 text-white' : 'bg-emerald-500/20 text-emerald-300'}">
+                  ${st.hasProblem ? '🚨 ' + st.issuesText : '✅ مكتمل'}
+                </div>
+              </td>
+            `).join('')}
+            <td class="p-2.5 text-center font-extrabold text-amber-300 num-ltr">${totalWeekAllHours} س</td>
+            <td class="p-2.5 text-center text-[11px] text-slate-300">تحديث لحظي</td>
+          </tr>
+        `;
+      }
+
+      // 3) رسم جدول الموظفين الأساسيين (النشطين والملغيين المحفوظة بياناتهم) أسفل الجدول مباشرة
+      if (coreMasterTbody) {
+        coreMasterTbody.innerHTML = allBranchEmps.map(e => {
+          const active = e.isActive !== false;
+          return `
+            <tr class="${active ? 'hover:bg-slate-50' : 'bg-amber-50/50 text-slate-500'}">
+              <td class="p-2.5 font-bold num-ltr">${e.empNo}</td>
+              <td class="p-2.5 font-extrabold ${active ? 'text-slate-900' : 'line-through text-slate-600'}">${e.name}</td>
+              <td class="p-2.5">${e.branch} • <span class="font-semibold text-teal-700">${e.role}</span></td>
+              <td class="p-2.5 font-bold">${e.baseSalary > 0 ? fmtMoney(e.baseSalary) : fmtMoney(e.hourlyRate) + '/ساعة'} (${e.contractType})</td>
+              <td class="p-2.5 num-ltr text-[11px]">ID: ${e.nationalId} | 📞 ${e.phone}</td>
+              <td class="p-2.5">
+                <span class="px-2.5 py-0.5 rounded-full font-bold text-[11px] ${active ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                  ${active ? '✅ نشط ويتحرك في الشفتات' : '📁 ملغي من الجدول (بياناته محفوظة بالكامل)'}
+                </span>
+              </td>
+              <td class="p-2.5 text-center">
+                <button type="button" data-toggle-emp-id="${e.id}" class="btn-toggle-emp-active px-3 py-1 rounded-lg font-bold text-[11px] shadow-sm transition ${active ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}">
+                  ${active ? '🚫 إلغاء من الجدول (حفظ البيانات)' : '♻️ إعادة تفعيل للجدول'}
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    // 14-D. محرك داشبورد "الشفت دلوقتي فيه كم واحد؟" (Live Shift Headcount Monitor)
+    function renderLiveShiftHeadcountMonitor() {
+      const daySelect = document.getElementById('liveShiftDaySelect');
+      const hourSelect = document.getElementById('liveShiftHourSelect');
+      if (!daySelect || !hourSelect) return;
+
+      const selectedDayKey = daySelect.value || 'thu';
+      const selectedHour = parseFloat(hourSelect.value || '13');
+      const dayObj = APP_STATE.daysList.find(d => d.key === selectedDayKey) || APP_STATE.daysList[5];
+
+      const branchFilter = APP_STATE.selectedBranch;
+      const emps = APP_STATE.employees.filter(e => e.isActive !== false && (branchFilter === 'ALL' || e.branch === branchFilter));
+
+      const groups = {
+        '8H_8_4': [],
+        '8H_3_11': [],
+        '12H_8_8': [],
+        '12H_11_11': []
+      };
+      const activeNowList = [];
+      const branchCounts = {};
+
+      emps.forEach((emp, idx) => {
+        const roster = ensureEmployeeRoster(emp.id, idx);
+        const shiftCode = roster[selectedDayKey] || 'OFF';
+        const shiftObj = APP_STATE.shiftCatalog[shiftCode];
+        if (!shiftObj || shiftCode === 'OFF') return;
+
+        // هل هذا الشفت يعمل في الساعة المختارة الآن؟
+        const isOnDutyNow = selectedHour >= shiftObj.startHour && selectedHour < shiftObj.endHour;
+        if (groups[shiftCode]) {
+          groups[shiftCode].push({ emp, isOnDutyNow, shiftObj });
+        }
+        if (isOnDutyNow) {
+          activeNowList.push({ emp, shiftObj });
+          branchCounts[emp.branch] = (branchCounts[emp.branch] || 0) + 1;
+        }
+      });
+
+      document.getElementById('liveTotalOnDutyCount').textContent = activeNowList.length;
+      const hourFormatted = selectedHour === 15 ? '03:30 م' : (selectedHour > 12 ? (selectedHour - 12) + ':00 م' : selectedHour + ':00 ص');
+      document.getElementById('liveShiftWindowNote').textContent = `${dayObj.name} • الساعة ${hourFormatted}`;
+
+      const updateShiftCard = (code, countId, namesId, badgeId) => {
+        const sObj = APP_STATE.shiftCatalog[code];
+        const shiftActiveNow = selectedHour >= sObj.startHour && selectedHour < sObj.endHour;
+        const assignedEmps = groups[code] || [];
+        const activeCount = shiftActiveNow ? assignedEmps.length : 0;
+
+        document.getElementById(countId).textContent = `${activeCount} / ${assignedEmps.length}`;
+        document.getElementById(namesId).textContent = assignedEmps.length
+          ? assignedEmps.map(x => x.emp.name).join(' ، ')
+          : 'لا يوجد موظفون مجدولون';
+
+        const badgeEl = document.getElementById(badgeId);
+        if (shiftActiveNow) {
+          badgeEl.className = 'text-[10px] bg-emerald-400 text-slate-950 font-extrabold px-1.5 py-0.5 rounded';
+          badgeEl.textContent = `شغال الآن (${assignedEmps.length})`;
+        } else {
+          badgeEl.className = 'text-[10px] bg-slate-800 text-slate-400 font-bold px-1.5 py-0.5 rounded';
+          badgeEl.textContent = `خارج وقت الشفت (${assignedEmps.length} مجدول)`;
+        }
+      };
+
+      updateShiftCard('8H_8_4', 'liveCount8hMorning', 'liveNames8hMorning', 'liveBadge8hMorningState');
+      updateShiftCard('8H_3_11', 'liveCount8hEvening', 'liveNames8hEvening', 'liveBadge8hEveningState');
+      updateShiftCard('12H_8_8', 'liveCount12h8to8', 'liveNames12h8to8', 'liveBadge12h8to8State');
+      updateShiftCard('12H_11_11', 'liveCount12h11to11', 'liveNames12h11to11', 'liveBadge12h11to11State');
+
+      const pillsContainer = document.getElementById('liveActiveStaffPills');
+      if (activeNowList.length === 0) {
+        pillsContainer.innerHTML = '<span class="text-rose-400 font-bold">لا يوجد موظفون في هذا التوقيت</span>';
+      } else {
+        pillsContainer.innerHTML = activeNowList.map(item => `
+          <span class="bg-teal-900/90 border border-teal-500/50 text-teal-100 px-2.5 py-1 rounded-full text-[11px] font-bold">
+            👤 ${item.emp.name} <span class="text-amber-300">(${item.shiftObj.shortLabel})</span>
+          </span>
+        `).join('');
+      }
+
+      const branchSummary = Object.keys(branchCounts).map(b => `${b.replace('فرع ', '')}: ${branchCounts[b]}`).join(' | ');
+      document.getElementById('liveBranchBreakdownText').textContent = branchSummary ? `توزيع الفروع الآن: ${branchSummary}` : '';
+    }
+
+    // 14-E. رسم بطاقة جدول الموظف للـ PDF والواتساب
+    function renderEmployeePdfCard() {
+      const selectEl = document.getElementById('pdfEmployeeSelect');
+      if (!selectEl) return;
+      const empName = selectEl.value || (APP_STATE.employees[0] && APP_STATE.employees[0].name);
+      const empIdx = APP_STATE.employees.findIndex(e => e.name === empName);
+      const emp = APP_STATE.employees[empIdx >= 0 ? empIdx : 0];
+      if (!emp) return;
+
+      const roster = ensureEmployeeRoster(emp.id, empIdx >= 0 ? empIdx : 0);
+      const weekLabel = document.getElementById('pdfWeekLabelInput').value || 'الأسبوع الحالي';
+      document.getElementById('pdfCardWeekSubtitle').textContent = `${weekLabel} • نظام إدارة المساحة المشتركة`;
+      document.getElementById('pdfEmpName').textContent = emp.name;
+      document.getElementById('pdfEmpRoleAndCode').textContent = `${emp.empNo} • ${emp.role}`;
+      document.getElementById('pdfEmpBranch').textContent = `${emp.branch} (${emp.roaming})`;
+
+      let totalHours = 0;
+      let workDaysCount = 0;
+      const rowsHtml = APP_STATE.daysList.map(d => {
+        const code = roster[d.key] || 'OFF';
+        const sObj = APP_STATE.shiftCatalog[code] || APP_STATE.shiftCatalog.OFF;
+        totalHours += sObj.hours;
+        if (sObj.hours > 0) workDaysCount++;
+
+        return `
+          <tr class="${code === 'OFF' ? 'bg-slate-50 text-slate-400' : 'bg-white text-slate-900'}">
+            <td class="p-2.5 border border-slate-300 font-extrabold">${d.name}</td>
+            <td class="p-2.5 border border-slate-300 font-bold">
+              <span class="px-2 py-0.5 rounded border ${sObj.badgeClass}">${sObj.label}</span>
+            </td>
+            <td class="p-2.5 border border-slate-300 text-center font-bold">${sObj.startText}</td>
+            <td class="p-2.5 border border-slate-300 text-center font-bold">${sObj.endText}</td>
+            <td class="p-2.5 border border-slate-300 text-center font-extrabold num-ltr">${sObj.hours} ساعة</td>
+            <td class="p-2.5 border border-slate-300">${emp.branch}</td>
+            <td class="p-2.5 border border-slate-300 text-[11px]">${code === 'OFF' ? 'راحة أسبوعية' : 'التزام ببصمة الـ Geofence'}</td>
+          </tr>
+        `;
+      }).join('');
+
+      document.getElementById('pdfEmployeeScheduleRows').innerHTML = rowsHtml;
+      document.getElementById('pdfEmpTotalHours').textContent = `${totalHours} ساعة (${workDaysCount} أيام عمل)`;
+    }
+
+    // 14-F. تحميل جدول الموظف كملف PDF فعلي
+    function downloadEmployeeScheduleAsPdf() {
+      const empName = document.getElementById('pdfEmployeeSelect').value || 'Employee';
+      const element = document.getElementById('printableEmployeeScheduleArea');
+      showToast(`جاري تجهيز وتحميل ملف PDF لجدول "${empName}"...`, 'info');
+
+      if (typeof html2pdf !== 'undefined') {
+        const opt = {
+          margin: 8,
+          filename: `جدول_شفتات_${empName.replace(/\s+/g, '_')}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        };
+        html2pdf().set(opt).from(element).save().then(() => {
+          showToast(`تم تحميل ملف PDF لجدول "${empName}" بنجاح!`, 'success');
+        }).catch(() => {
+          window.print();
+        });
+      } else {
+        window.print();
+      }
+    }
+
+    // 15. تهيئة الأحداث عند تحميل الصفحة
+    window.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('gasCodeDisplayBlock').textContent = GAS_BACKEND_SOURCE_CODE;
+
+      // التنقل بين التبويبات
+      const tabButtons = document.querySelectorAll('.tab-btn');
+      const tabPanels = document.querySelectorAll('.tab-panel');
+      function switchTab(targetId) {
+        tabButtons.forEach(btn => {
+          btn.classList.toggle('active', btn.getAttribute('data-tab') === targetId);
+        });
+        tabPanels.forEach(panel => {
+          panel.classList.toggle('hidden', panel.id !== targetId);
+        });
+        if (targetId === 'tab-dashboard') updateCharts();
+        if (targetId === 'tab-gas-backend') renderSheetPreview('Branches');
+      }
+
+      tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
+      });
+
+      document.getElementById('btnOpenGasCodeTab').addEventListener('click', () => switchTab('tab-gas-backend'));
+
+      // زر تهيئة وتنسيق الشيتات تلقائياً
+      document.getElementById('btnAutoFormatSheets').addEventListener('click', function() {
+        syncToGoogleSheetsBackend('INIT_AND_FORMAT', [], 'تم تشغيل محرك بناء وتنسيق الشيتات التسعة تلقائياً (RTL + Banding + Conditional Formatting)!');
+        switchTab('tab-gas-backend');
+      });
+
+      // حفظ رابط Google Script Web App
+      document.getElementById('btnSaveWebhookUrl').addEventListener('click', function() {
+        const url = document.getElementById('gasWebAppUrlInput').value.trim();
+        APP_STATE.gasWebAppUrl = url;
+        showToast(url ? 'تم ربط النظام برابط Google Apps Script Web App بنجاح' : 'تم التبديل إلى وضع المحاكاة المحلية', 'info');
+      });
+
+      // فلتر الفروع العام
+      document.getElementById('globalBranchFilter').addEventListener('change', function(e) {
+        APP_STATE.selectedBranch = e.target.value;
+        renderAllTablesAndKPIs();
+      });
+
+      // البحث في جدول الموظفين
+      document.getElementById('searchEmployeeInput').addEventListener('input', renderAllTablesAndKPIs);
+
+      // إضافة موظف جديد
+      document.getElementById('formAddEmployee').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const newEmp = {
+          id: 'EMP-' + (101 + APP_STATE.employees.length),
+          empNo: 'CW-2026-0' + (1 + APP_STATE.employees.length),
+          name: document.getElementById('empFullName').value.trim(),
+          nationalId: document.getElementById('empNationalId').value.trim(),
+          phone: document.getElementById('empPhone').value.trim(),
+          email: 'staff' + (1 + APP_STATE.employees.length) + '@coworkhub.eg',
+          branch: document.getElementById('empBranchSelect').value,
+          dept: 'التشغيل والمجتمع',
+          role: document.getElementById('empRoleSelect').value,
+          contractType: document.getElementById('empContractType').value,
+          baseSalary: parseFloat(document.getElementById('empBaseSalary').value || '0'),
+          hourlyRate: parseFloat(document.getElementById('empHourlyRate').value || '0'),
+          roaming: document.getElementById('empRoamingSelect').value,
+          costAllocation: document.getElementById('empCostAllocation').value.trim(),
+          insured: 'نعم',
+          hireDate: '2026-10-22',
+          status: 'نشط (ACTIVE)',
+          isActive: true
+        };
+        APP_STATE.employees.unshift(newEmp);
+        populateSelectDropdowns();
+        renderAllTablesAndKPIs();
+        syncToGoogleSheetsBackend('ADD_EMPLOYEE', Object.values(newEmp), `تمت إضافة الموظف "${newEmp.name}" إلى شيت Employees`);
+        e.target.reset();
+      });
+
+      // إضافة فرع جديد
+      document.getElementById('formAddBranch').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const newBranch = {
+          id: 'BR-0' + (1 + APP_STATE.branches.length),
+          code: document.getElementById('newBranchCode').value.trim().toUpperCase(),
+          name: document.getElementById('newBranchName').value.trim(),
+          city: 'الإسكندرية',
+          lat: parseFloat(document.getElementById('newBranchLat').value),
+          lng: parseFloat(document.getElementById('newBranchLng').value),
+          radius: 120,
+          is247: 'نعم (24/7)',
+          minFrontDesk: 2,
+          totalDesks: parseInt(document.getElementById('newBranchDesks').value, 10),
+          occupancyPct: 86.0,
+          manager: 'سارة المنشاوي',
+          status: 'نشط (ACTIVE)',
+          monthlyRevenue: 210000
+        };
+        APP_STATE.branches.push(newBranch);
+        populateSelectDropdowns();
+        renderAllTablesAndKPIs();
+        syncToGoogleSheetsBackend('ADD_BRANCH', Object.values(newBranch), `تم إنشاء "${newBranch.name}" في شيت Branches`);
+        e.target.reset();
+      });
+
+      // أحداث حاسبة العمولات
+      ['commProductCategory', 'commContractMonths', 'commEventType', 'commNetAmount', 'commPrimarySplit', 'commSecondaryEmp'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateCommissionPreview);
+        document.getElementById(id).addEventListener('change', updateCommissionPreview);
+      });
+
+      document.getElementById('formAddCommissionEvent').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const calc = updateCommissionPreview();
+        const newComm = {
+          id: 'COM-' + (901 + APP_STATE.commissions.length),
+          date: '2026-10-22',
+          invoiceNo: document.getElementById('commInvoiceNo').value.trim(),
+          clientName: document.getElementById('commClientName').value.trim(),
+          branch: document.getElementById('commBranchSelect').value,
+          eventType: document.getElementById('commEventType').value,
+          productCategory: document.getElementById('commProductCategory').value,
+          units: 4,
+          months: calc.months,
+          netAmount: parseFloat(document.getElementById('commNetAmount').value || '0'),
+          primaryEmp: document.getElementById('commPrimaryEmp').value,
+          primarySplit: calc.primarySplit,
+          secondaryEmp: document.getElementById('commSecondaryEmp').value,
+          secondarySplit: calc.secondarySplit,
+          ratePct: calc.finalRate,
+          totalCommission: calc.totalComm,
+          primaryAmount: calc.primaryShare,
+          secondaryAmount: calc.secondaryShare,
+          status: calc.totalComm < 0 ? 'خصم استرداد (CLAWBACK)' : 'معتمد للصرف'
+        };
+        APP_STATE.commissions.unshift(newComm);
+        renderAllTablesAndKPIs();
+        syncToGoogleSheetsBackend('RECORD_REVENUE_COMMISSION', Object.values(newComm), `تم تسجيل عمولة الفاتورة ${newComm.invoiceNo} وتحديث مسير الرواتب`);
+      });
+
+      document.getElementById('btnRecalculatePayroll').addEventListener('click', function() {
+        renderAllTablesAndKPIs();
+        syncToGoogleSheetsBackend('GENERATE_PAYSLIP', ['PAY-2026-10', 'أكتوبر 2026'], 'تم إعادة احتساب وترحيل قسائم الرواتب والعمولات لشيت Payroll_Slips');
+      });
+
+      // أحداث الـ Geofencing والحضور
+      ['attBranchSelect', 'attEmployeeSelect', 'attInputLat', 'attInputLng'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateGeofencePreview);
+        document.getElementById(id).addEventListener('change', updateGeofencePreview);
+      });
+
+      document.getElementById('btnSimulateInsideGeofence').addEventListener('click', function() {
+        const bName = document.getElementById('attBranchSelect').value;
+        const b = APP_STATE.branches.find(x => x.name === bName) || APP_STATE.branches[0];
+        document.getElementById('attInputLat').value = (b.lat + 0.0001).toFixed(4);
+        document.getElementById('attInputLng').value = (b.lng + 0.0001).toFixed(4);
+        updateGeofencePreview();
+      });
+
+      document.getElementById('btnSimulateOutsideGeofence').addEventListener('click', function() {
+        const bName = document.getElementById('attBranchSelect').value;
+        const b = APP_STATE.branches.find(x => x.name === bName) || APP_STATE.branches[0];
+        document.getElementById('attInputLat').value = (b.lat + 0.0042).toFixed(4);
+        document.getElementById('attInputLng').value = (b.lng + 0.0035).toFixed(4);
+        updateGeofencePreview();
+      });
+
+      document.getElementById('formGeofenceCheckin').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const geo = updateGeofencePreview();
+        const newAtt = {
+          id: 'ATT-' + (501 + APP_STATE.attendance.length),
+          date: '2026-10-22',
+          empId: geo.emp.id,
+          empName: geo.emp.name,
+          branch: geo.branch.name,
+          shift: document.getElementById('attShiftSelect').value,
+          checkIn: '08:02',
+          checkOut: '16:30',
+          workedHours: parseFloat(document.getElementById('attWorkedHours').value || '8'),
+          overtimeHours: parseFloat(document.getElementById('attOvertimeHours').value || '0'),
+          coords: `${document.getElementById('attInputLat').value}, ${document.getElementById('attInputLng').value}`,
+          distanceM: geo.dist,
+          geofenceStatus: geo.inside ? 'داخل النطاق (INSIDE_GEOFENCE)' : 'خارج النطاق (OUTSIDE_GEOFENCE)',
+          mode: geo.emp.branch === geo.branch.name ? 'فرع أساسي' : 'تغطية متنقلة (Roaming)'
+        };
+        APP_STATE.attendance.unshift(newAtt);
+        renderAllTablesAndKPIs();
+        syncToGoogleSheetsBackend('LOG_ATTENDANCE', Object.values(newAtt), `تم تسجيل بصمة "${newAtt.empName}" على بُعد ${newAtt.distanceM} متر`);
+      });
+
+      // فحص تغطية الاستقبال عند تغيير الموظف البديل في الإجازات
+      document.getElementById('leaveReplacementSelect').addEventListener('change', function(e) {
+        const alertBox = document.getElementById('leaveCoverageAlertBox');
+        if (e.target.value === 'بدون بديل') {
+          alertBox.className = 'p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-bold';
+          alertBox.textContent = '⚠️ تحذير محرك التغطية: غياب الموظف بدون بديل يخفض تغطية الاستقبال عن الحد الأدنى للفرع!';
+        } else {
+          alertBox.className = 'p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold';
+          alertBox.textContent = `✅ فحص التغطية الآلي: البديل (${e.target.value}) يضمن استمرار تغطية الاستقبال 100%.`;
+        }
+      });
+
+      document.getElementById('formLeaveRequest').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const empName = document.getElementById('leaveEmpSelect').value;
+        const emp = APP_STATE.employees.find(x => x.name === empName) || APP_STATE.employees[0];
+        const rep = document.getElementById('leaveReplacementSelect').value;
+        const isSafe = rep !== 'بدون بديل';
+
+        const newLeave = {
+          id: 'LV-' + (301 + APP_STATE.leaves.length),
+          submittedAt: '2026-10-22',
+          empId: emp.id,
+          empName: emp.name,
+          branch: emp.branch,
+          role: emp.role,
+          leaveType: document.getElementById('leaveTypeSelect').value,
+          startDate: document.getElementById('leaveStartDate').value,
+          endDate: document.getElementById('leaveEndDate').value,
+          days: parseInt(document.getElementById('leaveDaysCount').value || '1', 10),
+          replacement: rep,
+          coverageCheck: isSafe ? 'آمن - تغطية الاستقبال مكتملة (2/2)' : 'عجز تغطية! الاستقبال ينخفض إلى (1/2)',
+          status: isSafe ? 'معتمد' : 'معلق لحين توفير بديل'
+        };
+        APP_STATE.leaves.unshift(newLeave);
+        renderAllTablesAndKPIs();
+        syncToGoogleSheetsBackend('SUBMIT_LEAVE', Object.values(newLeave), 'تم تسجيل طلب الإجازة وفحص تغطية الفرع في شيت Leaves_Coverage');
+      });
+
+      // اعتماد الإجازة من الجدول
+      document.getElementById('leavesTableBody').addEventListener('click', function(e) {
+        const btn = e.target.closest('.btn-approve-leave');
+        if (!btn) return;
+        const idx = parseInt(btn.getAttribute('data-leave-idx'), 10);
+        const item = APP_STATE.leaves[idx];
+        if (!item) return;
+        item.status = item.status === 'معتمد' ? 'قيد المراجعة' : 'معتمد';
+        renderAllTablesAndKPIs();
+        showToast(`تم تحديث حالة إجازة "${item.empName}" إلى: ${item.status}`, 'info');
+      });
+
+      // طلب تبديل الورديات (Shift Swap)
+      document.getElementById('formShiftSwap').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const req = document.getElementById('swapRequesterSelect').value;
+        const tar = document.getElementById('swapTargetSelect').value;
+        const samePerson = req === tar;
+        const newSwap = {
+          id: 'SWP-' + (201 + APP_STATE.shiftSwaps.length),
+          date: '2026-10-22',
+          requester: req,
+          requesterShift: document.getElementById('swapRequesterShift').value,
+          targetPeer: tar,
+          targetShift: document.getElementById('swapTargetShift').value,
+          branch: 'فرع كفر عبده - الإسكندرية',
+          doubleShiftCheck: samePerson ? 'مرفوض (نفس الموظف!)' : 'آمن (فاصل راحة 16 ساعة)',
+          peerStatus: samePerson ? 'مرفوض' : 'موافق',
+          managerStatus: samePerson ? 'مرفوض آلياً' : 'معتمد'
+        };
+        APP_STATE.shiftSwaps.unshift(newSwap);
+        renderAllTablesAndKPIs();
+        syncToGoogleSheetsBackend('SUBMIT_SHIFT_SWAP', Object.values(newSwap), 'تم تسجيل طلب تبديل الوردية في شيت Shift_Swaps_ESS');
+      });
+
+      // إضافة سجل توظيف Trial Shift أو KPI
+      document.getElementById('formAddAtsKpi').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const nps = parseFloat(document.getElementById('atsNpsScore').value || '90');
+        const ret = parseFloat(document.getElementById('atsRetentionPct').value || '90');
+        const score = Math.round((nps * 0.5) + (ret * 0.5));
+        const newEntry = {
+          id: 'KPI-' + (701 + APP_STATE.atsKpis.length),
+          type: document.getElementById('atsKpiType').value,
+          name: document.getElementById('atsKpiName').value.trim(),
+          branch: 'فرع كفر عبده - الإسكندرية',
+          role: 'Community & Operations',
+          dateOrMonth: 'أكتوبر 2026',
+          nps: nps,
+          retentionPct: ret,
+          salesTargetPct: 100,
+          finalScore: score,
+          decision: score >= 85 ? 'ممتاز - استحقاق الحافز / التعيين' : 'يحتاج متابعة وتدريب'
+        };
+        APP_STATE.atsKpis.unshift(newEntry);
+        renderAllTablesAndKPIs();
+        syncToGoogleSheetsBackend('ADD_ATS_KPI', Object.values(newEntry), 'تم حفظ التقييم في شيت ATS_KPIs');
+        e.target.reset();
+      });
+
+      // إخلاء الطرف السريع وإيقاف بطاقات الـ RFID
+      document.getElementById('formOffboarding').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const empName = document.getElementById('offEmpSelect').value;
+        const newOff = {
+          id: 'OFF-' + (801 + APP_STATE.offboarding.length),
+          date: '2026-10-22',
+          empId: 'EMP-CLR',
+          empName: empName,
+          branch: 'فرع كفر عبده - الإسكندرية',
+          actionType: document.getElementById('offActionType').value,
+          assets: document.getElementById('offAssetsInput').value,
+          rfidStatus: 'تم الإيقاف الفوري (REVOKED)',
+          bmsStatus: 'تم سحب صلاحية BMS والـ Wi-Fi',
+          settlement: parseFloat(document.getElementById('offSettlementAmount').value || '0'),
+          status: 'مكتمل'
+        };
+        APP_STATE.offboarding.unshift(newOff);
+        renderAllTablesAndKPIs();
+        syncToGoogleSheetsBackend('INITIATE_OFFBOARDING', Object.values(newOff), `تم إيقاف صلاحيات البطاقة الذكية لـ "${empName}" وتوثيق إخلاء الطرف`);
+      });
+
+      // أزرار نسخ الكود ومعاينة الشيتات
+      document.getElementById('btnCopyGasCode').addEventListener('click', copyGasCodeToClipboard);
+      document.getElementById('btnCopyGasCodeBottom').addEventListener('click', copyGasCodeToClipboard);
+      document.getElementById('btnPreviewSheetFormatting').addEventListener('click', function() {
+        document.getElementById('sheetFormattingPreviewCard').scrollIntoView({ behavior: 'smooth' });
+      });
+
+      document.getElementById('sheetTabsSelector').addEventListener('click', function(e) {
+        const btn = e.target.closest('.btn-sheet-preview');
+        if (!btn) return;
+        renderSheetPreview(btn.getAttribute('data-sheet-key'));
+      });
+
+      // تغيير الحد الأدنى المطلوب يومياً لكشف أيام المشاكل فوراً
+      document.getElementById('minDailyStaffInput').addEventListener('input', function() {
+        renderWeeklyRosterTable();
+      });
+
+      // دالة إلغاء تفعيل الموظف الأساسي من الجداول مع الاحتفاظ بكامل بياناته (أو إعادة تفعيله)
+      function handleToggleEmployeeActiveState(e) {
+        const btn = e.target.closest('.btn-toggle-emp-active');
+        if (!btn) return;
+        const empId = btn.getAttribute('data-toggle-emp-id');
+        const emp = APP_STATE.employees.find(x => x.id === empId);
+        if (!emp) return;
+
+        emp.isActive = (emp.isActive === false) ? true : false;
+        emp.status = emp.isActive ? 'نشط (ACTIVE)' : 'ملغي - محفوظ البيانات (ARCHIVED)';
+
+        populateSelectDropdowns();
+        renderAllTablesAndKPIs();
+
+        if (emp.isActive) {
+          showToast(`♻️ تمت إعادة تفعيل الموظف الأساسي "${emp.name}" وعاد للظهور في الجداول والشفتات!`, 'success');
+        } else {
+          showToast(`📁 تم إلغاء "${emp.name}" من جداول الشفتات النشطة مع الاحتفاظ بكامل بياناته وسجلاته التاريخية!`, 'warning');
+        }
+      }
+
+      document.getElementById('coreMasterStaffTableBody').addEventListener('click', handleToggleEmployeeActiveState);
+      document.getElementById('weeklyRosterTableBody').addEventListener('click', handleToggleEmployeeActiveState);
+      document.getElementById('employeesTableBody').addEventListener('click', handleToggleEmployeeActiveState);
+
+      // أحداث داشبورد الشفت اللحظي وتنظيم الجداول والـ PDF
+      document.getElementById('liveShiftDaySelect').addEventListener('change', renderLiveShiftHeadcountMonitor);
+      document.getElementById('liveShiftHourSelect').addEventListener('change', renderLiveShiftHeadcountMonitor);
+
+      document.getElementById('btnSyncRealClockNow').addEventListener('click', function() {
+        const now = new Date();
+        const jsDay = now.getDay(); // 0 Sun .. 6 Sat
+        const dayMap = { 6: 'sat', 0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri' };
+        document.getElementById('liveShiftDaySelect').value = dayMap[jsDay] || 'thu';
+        const currentHour = Math.max(8, Math.min(23, now.getHours()));
+        const availableHours = [8, 10, 11, 13, 15, 17, 19, 21, 23];
+        const closestHour = availableHours.reduce((prev, curr) => Math.abs(curr - currentHour) < Math.abs(prev - currentHour) ? curr : prev);
+        document.getElementById('liveShiftHourSelect').value = String(closestHour);
+        renderLiveShiftHeadcountMonitor();
+        showToast('تم ضبط داشبورد الشفت على التوقيت الفعلي الآن', 'info');
+      });
+
+      document.getElementById('btnJumpToRosterFromDash').addEventListener('click', function() {
+        switchTab('tab-roster');
+      });
+
+      // تحديث ساعات العمل تلقائياً عند اختيار شفت 8 ساعات أو 12 ساعة في نافذة الحضور
+      document.getElementById('attShiftSelect').addEventListener('change', function(e) {
+        const opt = e.target.options[e.target.selectedIndex];
+        const hrs = opt.getAttribute('data-hours');
+        if (hrs) document.getElementById('attWorkedHours').value = hrs;
+      });
+
+      // تغيير شفت يوم معين لموظف مباشرة من الجدول الأسبوعي
+      document.getElementById('weeklyRosterTableBody').addEventListener('change', function(e) {
+        const sel = e.target.closest('.roster-cell-select');
+        if (!sel) return;
+        const empId = sel.getAttribute('data-emp-id');
+        const dayKey = sel.getAttribute('data-day-key');
+        if (!APP_STATE.weeklyRoster[empId]) APP_STATE.weeklyRoster[empId] = {};
+        APP_STATE.weeklyRoster[empId][dayKey] = sel.value;
+        renderAllTablesAndKPIs();
+        showToast('تم تحديث الشفت وحساب الساعات وتحديث داشبورد المتواجدين الآن', 'success');
+      });
+
+      // زر استخراج PDF من صف الموظف مباشرة
+      document.getElementById('weeklyRosterTableBody').addEventListener('click', function(e) {
+        const btn = e.target.closest('.btn-row-export-pdf');
+        if (!btn) return;
+        const empName = btn.getAttribute('data-pdf-emp');
+        document.getElementById('pdfEmployeeSelect').value = empName;
+        renderEmployeePdfCard();
+        document.getElementById('employeePdfExportCard').scrollIntoView({ behavior: 'smooth' });
+        downloadEmployeeScheduleAsPdf();
+      });
+
+      // نموذج التعيين السريع لجدول موظف طوال الأسبوع
+      document.getElementById('formQuickAssignWeek').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const empName = document.getElementById('quickRosterEmpSelect').value;
+        const shiftCode = document.getElementById('quickRosterShiftSelect').value;
+        const offDay = document.getElementById('quickRosterOffDaySelect').value;
+        const emp = APP_STATE.employees.find(x => x.name === empName);
+        if (!emp) return;
+
+        APP_STATE.weeklyRoster[emp.id] = {};
+        APP_STATE.daysList.forEach(d => {
+          APP_STATE.weeklyRoster[emp.id][d.key] = (d.key === offDay) ? 'OFF' : shiftCode;
+        });
+        document.getElementById('pdfEmployeeSelect').value = emp.name;
+        renderAllTablesAndKPIs();
+        showToast(`تم تنظيم جدول الأسبوع بالكامل للموظف "${emp.name}"`, 'success');
+      });
+
+      // التوزيع المتوازن التلقائي للشفتات الأربعة على جميع الموظفين
+      document.getElementById('btnAutoBalanceRoster').addEventListener('click', function() {
+        const shiftCycle = ['8H_8_4', '8H_3_11', '12H_8_8', '12H_11_11'];
+        const offDaysCycle = ['fri', 'sat', 'sun', 'wed', 'tue'];
+        APP_STATE.employees.forEach((emp, idx) => {
+          const primaryShift = shiftCycle[idx % shiftCycle.length];
+          const altShift = shiftCycle[(idx + 1) % shiftCycle.length];
+          const offDay = offDaysCycle[idx % offDaysCycle.length];
+          APP_STATE.weeklyRoster[emp.id] = {};
+          APP_STATE.daysList.forEach((d, dIdx) => {
+            if (d.key === offDay) {
+              APP_STATE.weeklyRoster[emp.id][d.key] = 'OFF';
+            } else {
+              APP_STATE.weeklyRoster[emp.id][d.key] = (dIdx % 3 === 0) ? altShift : primaryShift;
+            }
+          });
+        });
+        renderAllTablesAndKPIs();
+        showToast('تم توزيع وتنظيم الشفتات (8 ساعات و12 ساعة) تلقائياً لضمان تغطية جميع الأوقات!', 'success');
+      });
+
+      // حفظ جدول الأسبوع في Google Sheets
+      document.getElementById('btnSaveRosterToSheets').addEventListener('click', function() {
+        const firstEmp = APP_STATE.employees[0];
+        const r = APP_STATE.weeklyRoster[firstEmp.id] || {};
+        const rowData = [
+          firstEmp.id,
+          firstEmp.name,
+          firstEmp.branch,
+          r.sat, r.sun, r.mon, r.tue, r.wed, r.thu, r.fri
+        ];
+        syncToGoogleSheetsBackend('SAVE_WEEKLY_ROSTER', rowData, 'تم ترحيل وحفظ جداول شفتات الموظفين في شيت Weekly_Roster بنجاح');
+      });
+
+      // أحداث بطاقة تصدير الـ PDF والواتساب
+      document.getElementById('pdfEmployeeSelect').addEventListener('change', renderEmployeePdfCard);
+      document.getElementById('pdfWeekLabelInput').addEventListener('input', renderEmployeePdfCard);
+      document.getElementById('btnDownloadEmployeePdf').addEventListener('click', downloadEmployeeScheduleAsPdf);
+      document.getElementById('btnPrintEmployeePdf').addEventListener('click', function() {
+        window.print();
+      });
+
+      document.getElementById('btnCopyWhatsappSchedule').addEventListener('click', function() {
+        const empName = document.getElementById('pdfEmployeeSelect').value;
+        const emp = APP_STATE.employees.find(e => e.name === empName) || APP_STATE.employees[0];
+        const roster = APP_STATE.weeklyRoster[emp.id] || {};
+        const lines = APP_STATE.daysList.map(d => {
+          const s = APP_STATE.shiftCatalog[roster[d.key] || 'OFF'];
+          return `• ${d.name}: ${s.label}`;
+        }).join('\n');
+        const msg = `📅 *جدول شفتات العمل الأسبوعي - ${emp.name}*\n🏢 الفرع: ${emp.branch}\n${lines}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(msg);
+        }
+        showToast(`تم نسخ جدول "${emp.name}" منسقاً وجاهزاً للإرسال عبر واتساب!`, 'success');
+      });
+
+      // التشغيل الأولي
+      populateSelectDropdowns();
+      updateCommissionPreview();
+      updateGeofencePreview();
+      renderAllTablesAndKPIs();
+      renderSheetPreview('Branches');
+    });
+  </script>
+</body>
+</html>
